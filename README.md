@@ -17,6 +17,7 @@ Dependencies:
       - show_label_mask.m
       - sliding_window_filter.m
       - zero_padding.m
+
 Additional scripts/functions useful for manual curation of data:
       - add_event.m
       - event_stats.m
