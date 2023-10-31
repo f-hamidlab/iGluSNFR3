@@ -31,3 +31,5 @@ Detection of Synaptic Activities in 2-Photon Microscopy
 - show_label_mask.m
 - spike_train.m
 - spike_train_par.m
+
+For installation of the toolbox, please refer to the [wiki page](https://github.com/f-hamidlab/iGluSNFR3/wiki/02-Using-the-Scripts).
