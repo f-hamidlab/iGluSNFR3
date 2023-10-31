@@ -1,6 +1,8 @@
 # iGluSNFR3
 Detection of Synaptic Activities in 2-Photon Microscopy
 
+For installation and details of the toolbox, please refer to the [wiki page](https://github.com/f-hamidlab/iGluSNFR3/wiki/02-Using-the-Scripts).
+
 ## Designed for:
 - single plane image 
 - iGluSNFR3 probe
@@ -32,4 +34,3 @@ Detection of Synaptic Activities in 2-Photon Microscopy
 - spike_train.m
 - spike_train_par.m
 
-For installation of the toolbox, please refer to the [wiki page](https://github.com/f-hamidlab/iGluSNFR3/wiki/02-Using-the-Scripts).
