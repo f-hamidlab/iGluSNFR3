@@ -4,7 +4,8 @@ Detection of Synaptic Activities in 2-Photon Microscopy
 ## Designed for:
 - single plane image 
 - iGluSNFR3 probe
-- multiple cells
+- multi-cellular
+- spontaneous synaptic activities
 
 ## Dependencies:
 1) MLspike toolbox (https://github.com/MLspike)
