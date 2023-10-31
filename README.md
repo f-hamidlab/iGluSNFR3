@@ -18,7 +18,7 @@ Dependencies:
       - sliding_window_filter.m
       - zero_padding.m
 
-Additional scripts/functions useful for manual curation of data:
+Additional scripts/functions useful for manual curation of data: <br>
       - add_event.m
       - event_stats.m
       - plot_signal_pixel.m
