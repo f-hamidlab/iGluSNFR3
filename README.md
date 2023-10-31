@@ -1,5 +1,5 @@
 # iGluSNFR3
-Detection of Synaptic Activities in 2-Photon Microscopy
+Detection of Synaptic Activities in Widefield Microscopy
 
 For installation and details of the toolbox, please refer to the [wiki page](https://github.com/f-hamidlab/iGluSNFR3/wiki/02-Using-the-Scripts).
 
