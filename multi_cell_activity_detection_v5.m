@@ -27,7 +27,9 @@
 %       - show_label_mask.m
 %       - spike_train.m
 %       - spike_train_par.m
-
+%
+% Last modified: 2023-11-13 11:32 am
+%                (adding filter for area of ROI)
 
 close all
 clear
@@ -64,10 +66,14 @@ ops.BL_drift_thres = 70;
 ops.rising_time_thres = 5; % [frames]
 ops.maxISI = 8; % [frames]
 ops.findpeak_window = 7; % [frames]
+ops.dfof_MinPeakHeight = 3; % for each pixel, multiple of SD
 ops.MinPeakHeight = 150; % for 2d findpeaks
 
 % frame rate
 ops.fs = 100; % [Hz]
+
+% filter for ROI area
+ops.Area_thres = 2; % [px]
 
 % cutoff for clustering
 ops.cutoff = 3; % [pixels]
@@ -295,7 +301,7 @@ parfor i = 1:size(signal_raw,2) % for each pixel
         t_end = min([ops.Nt, t_start+ops.findpeak_window]);
 
         [~, dff_t] = findpeaks(signal_dfof(t_start:t_end,i),'NPeaks',1, ...
-            'MinPeakHeight', 3*px(i).STD);
+            'MinPeakHeight', ops.dfof_MinPeakHeight*px(i).STD);
         % find the first zero-crossing
         % if the first zero-crossing is over threshold, remove pt
         if ~isempty(dff_t)
@@ -377,6 +383,9 @@ tic;
 disp('Defining ROI...')
 L = bwlabel(pxmask,8);
 ROI = regionprops(L,"PixelIdxList", "PixelList", "Area", "Centroid");
+
+% remove ROI with Area> threshold
+ROI = ROI([ROI.Area] > ops.Area_thres);
 
 figure;
 imagesc(L)
@@ -798,4 +807,3 @@ end
 function [ G_values ] = calc1DGaussian(x_values, sigma)
     G_values = 1/sigma/sqrt(2*pi).*exp(-x_values.^2./2./sigma^2);
 end
-
