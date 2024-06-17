@@ -27,11 +27,12 @@
 %       - ROI_pxMap_allTime.m
 %       - save_data.m
 %       - show_label_mask.m
+%       - show_label_mask_with_text.m
 %       - spike_train.m
 %       - spike_train_par.m
 %
-% Last modified: 2024-01-24 11:32 am
-%                (adding clustering of ROIs close to each other with similar timing of spikes)
+% Last modified: 2024-06-17 11:32 am
+%                (tidy up)
 
 close all
 clear
@@ -43,10 +44,16 @@ if(~isdeployed)
 end
 
 % path to data folder
-foldername = '/PATH/TO/PROJECT/originals';
+% foldername = '/PATH/TO/PROJECT/originals';
+foldername = '../originals/multiple_cells/';
 
 % path to other required functions
-addpath('/PATH/TO/PROJECT/codes') % folder
+% addpath('/PATH/TO/PROJECT/codes') % folder
+addpath('Scripts/')
+addpath('bfmatlab/')
+addpath('MLspike/brick/')
+addpath('MLspike/spikes/')
+
 
 loop_through_folder(foldername)
 
@@ -254,9 +261,9 @@ toc
 % Getting baseline 
 disp('Calculating baselines...')
 signal_baseline = sliding_window_filter(signal_raw, ops.baseline_percentage, ops.sl_window);
-% signal_baseline_movemean = movmean(signal_raw, 10, 1);% window of 10
+signal_baseline_movemean = movmean(signal_raw, 10, 1);% window of 10
 signal_df = signal_raw - signal_baseline;
-% signal_df_movemean = signal_raw - signal_baseline_movemean;
+signal_df_movemean = signal_raw - signal_baseline_movemean;
 signal_baseline = signal_baseline + median(signal_df,1);
 signal_df = signal_df - median(signal_df,1);
 signal_dfof = signal_df./signal_baseline;
