@@ -10,11 +10,11 @@
 function ROI_pxMap_allTime(n)
 
     % get variables from base workspace
-    ROI = evalin('base', 'ROI');
-    ops = evalin('base', 'ops');
-    ind = evalin('base', 'ind');
-    signal_df = evalin('base', 'signal_df');
-    signal_dfof = evalin('base', 'signal_dfof');
+    ROI = evalin('caller', 'ROI');
+    ops = evalin('caller', 'ops');
+    ind = evalin('caller', 'ind');
+    signal_df = evalin('caller', 'signal_df');
+    signal_dfof = evalin('caller', 'signal_dfof');
 
     % for each ROI
     fprintf('ROI%03d\n',n)

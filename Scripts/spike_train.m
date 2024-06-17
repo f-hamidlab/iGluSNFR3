@@ -9,11 +9,11 @@
 
 function spike_train(k)
     % get variables from base workspace
-    event_cluster = evalin('base', 'event_cluster');
-    ROI = evalin('base', 'ROI');
-    px = evalin('base', 'px');
-    signal_raw = evalin('base', 'signal_raw');
-    ops = evalin('base', 'ops');
+    event_cluster = evalin('caller', 'event_cluster');
+    ROI = evalin('caller', 'ROI');
+    px = evalin('caller', 'px');
+    signal_raw = evalin('caller', 'signal_raw');
+    ops = evalin('caller', 'ops');
 
 
     % remove ROI from event_cluster
@@ -67,5 +67,5 @@ function spike_train(k)
 
     end
 
-    assignin("base","event_cluster",event_cluster)
+    assignin("caller","event_cluster",event_cluster)
 end
