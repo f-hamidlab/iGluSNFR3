@@ -5,7 +5,7 @@ For installation and details of the toolbox, please refer to the [wiki page](htt
 
 ## Designed for:
 - single plane image 
-- iGluSNFR3 probe
+- [iGluSNFR3 probe] (https://www.nature.com/articles/s41592-023-01863-6)
 - multi-cellular
 - spontaneous synaptic activities
 
