@@ -27,12 +27,11 @@
 %       - ROI_pxMap_allTime.m
 %       - save_data.m
 %       - show_label_mask.m
-%       - show_label_mask_with_text.m
 %       - spike_train.m
 %       - spike_train_par.m
 %
-% Last modified: 2024-06-17 11:32 am
-%                (tidy up)
+% Last modified: 2024-10-18 17:26 pm
+%                (added tophat filter for stack)
 
 close all
 clear
@@ -44,16 +43,13 @@ if(~isdeployed)
 end
 
 % path to data folder
-% foldername = '/PATH/TO/PROJECT/originals';
-foldername = '../originals/multiple_cells/';
+foldername = '/PATH/TO/PROJECT/originals/';
 
 % path to other required functions
-% addpath('/PATH/TO/PROJECT/codes') % folder
-addpath('Scripts/')
-addpath('bfmatlab/')
-addpath('MLspike/brick/')
-addpath('MLspike/spikes/')
-
+addpath('./')
+addpath('../bfmatlab/')
+addpath('../MLspike/brick/')
+addpath('../MLspike/spikes/')
 
 loop_through_folder(foldername)
 
@@ -106,7 +102,8 @@ ops.BL_drift_thres = 70;
 ops.rising_time_thres = 5; % [frames]
 ops.maxISI = 8; % [frames]
 ops.findpeak_window = 7; % [frames]
-ops.dfof_MinPeakHeight = 3; % for each pixel, multiple of SD
+ops.dfof_MinPeakHeight = 4; % for each pixel, multiple of SD
+ops.MinPeakWidth = 2; % for 1d findpeaks, [sampling pts]
 ops.MinPeakHeight = 150; % for 2d findpeaks
 
 % frame rate
@@ -169,6 +166,13 @@ colorbar;
 saveas(gcf, strcat(ops.savedir,filesep, 'Fig1_FirstFrame.fig'))
 saveas(gcf, strcat(ops.savedir,filesep, 'Fig1_FirstFrame',ops.fig_format))
 close(gcf)
+
+% tophat filter (background subtraction)
+tic;
+disp('Applying Tophat filter...')
+se = strel("cuboid",[24 24 20]);
+im_data = imtophat(im_data,se);
+toc;
 
 % start timer
 tic;
@@ -261,9 +265,9 @@ toc
 % Getting baseline 
 disp('Calculating baselines...')
 signal_baseline = sliding_window_filter(signal_raw, ops.baseline_percentage, ops.sl_window);
-signal_baseline_movemean = movmean(signal_raw, 10, 1);% window of 10
+% signal_baseline_movemean = movmean(signal_raw, 10, 1);% window of 10
 signal_df = signal_raw - signal_baseline;
-signal_df_movemean = signal_raw - signal_baseline_movemean;
+% signal_df_movemean = signal_raw - signal_baseline_movemean;
 signal_baseline = signal_baseline + median(signal_df,1);
 signal_df = signal_df - median(signal_df,1);
 signal_dfof = signal_df./signal_baseline;
@@ -330,7 +334,10 @@ parfor i = 1:size(signal_raw,2) % for each pixel
         t_end = min([ops.Nt, t_start+ops.findpeak_window]);
 
         [~, dff_t] = findpeaks(signal_dfof(t_start:t_end,i),'NPeaks',1, ...
-            'MinPeakHeight', ops.dfof_MinPeakHeight*px(i).STD);
+            'MinPeakHeight', ops.dfof_MinPeakHeight*px(i).STD, ...
+            'WidthReference','halfheight',...
+            'MinPeakWidth',ops.MinPeakWidth);
+        
         % find the first zero-crossing
         % if the first zero-crossing is over threshold, remove pt
         if ~isempty(dff_t)
@@ -437,6 +444,7 @@ close(gcf)
 % initialize empty array
 empty_cell = cell(length(ROI),1);
 [ROI.df] = empty_cell{:};
+[ROI.dfof] = empty_cell{:};
 [ROI.dfft] = empty_cell{:};
 [ROI.t] = empty_cell{:}; % non-repeating timing of events
 
@@ -537,7 +545,13 @@ toc;
 ops.ratio_thres = 0.02;
 ops.area_thres = 200;
 
-[n_cluster,~] = histcounts(vertcat(event_cluster.ROI),length(ROI));
+if isfield(event_cluster,'ROI')
+    [n_cluster,~] = histcounts(vertcat(event_cluster.ROI),length(ROI));
+else
+    disp('No ROI detected. Skipping...')
+    return
+end
+
 n_px = vertcat(ROI.Area);
 
 ratio = n_cluster'./(n_px);
@@ -633,6 +647,7 @@ function ROI = ROI_properties(ROI, n)
     
     ind = evalin('caller', 'ind');
     signal_df = evalin('caller', 'signal_df');
+    signal_dfof = evalin('caller', 'signal_dfof');
     px = evalin('caller', 'px');
     ops = evalin('caller', 'ops');  
 
@@ -641,8 +656,6 @@ function ROI = ROI_properties(ROI, n)
     
     % kernal for moving sum
     kernal = ones(5,1);
-
-    
 
     % find stats of corresponding pixels
     [~,idx] = intersect(ind, ROI(n).PixelIdxList,'stable');
@@ -653,6 +666,8 @@ function ROI = ROI_properties(ROI, n)
     end
     
     ROI(n).df = mean(signal_df(:,idx), 2);
+    ROI(n).dfof = mean(signal_dfof(:,idx), 2);
+
     if ROI(n).Area == 1 % only one pixel
         ROI(n).t = ROI(n).dfft;
     else
@@ -683,10 +698,10 @@ function remove_px(k)
     evalin('caller','signal_raw = signal_raw(:,k);');
 
     evalin('caller','signal_baseline = signal_baseline(:,k);');
-    evalin('caller','signal_baseline_movemean = signal_baseline_movemean(:,k);');
+    % evalin('caller','signal_baseline_movemean = signal_baseline_movemean(:,k);');
     
     evalin('caller','signal_df = signal_df(:,k);');
-    evalin('caller','signal_df_movemean = signal_df_movemean(:,k);');
+    % evalin('caller','signal_df_movemean = signal_df_movemean(:,k);');
 
     evalin('caller','signal_dfof = signal_dfof(:,k);');
     evalin('caller','signal_dfof_movemean = signal_dfof_movemean(:,k);');
