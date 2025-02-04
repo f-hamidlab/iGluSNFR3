@@ -1,8 +1,8 @@
 %% cluster_events
 % cluster events in ROI
 %
-% Last updated: 2024-01-25 12:31
-%               (remove repeated spikes in cluster)
+% Last updated: 2025-02-04 14:37
+%               (fixed PixelList)
 %
 % USAGE:
 % 1) event_cluster = cluster_events(ROI,event_cluster,n)
@@ -31,7 +31,9 @@ function event_cluster = cluster_events(ROI,event_cluster,n)
     t = ROI(n).t;
     
     % get location of each spike
-    PixelList = ROI(n).PixelList;
+    [row,col] = ind2sub([ops.Ny, ops.Nx],ind(idx));
+    PixelList = [col,row];
+
     xLim = [min(PixelList(:,1))-5, max(PixelList(:,1))+5];
     yLim = [min(PixelList(:,2))-5, max(PixelList(:,2))+5];
     x = xLim(1):xLim(2);
@@ -133,7 +135,7 @@ function event_cluster = cluster_events(ROI,event_cluster,n)
         event_cluster(end).n_spikes = length(ROI(n).t);
         event_cluster(end).ST = 0;
 
-    elseif length(peak_x) == 1 % only one event
+    elseif isscalar(peak_x) % only one event
         event_cluster(end+1).ROI = n;
         event_cluster(end).x = peak_x;
         event_cluster(end).y = peak_y;
