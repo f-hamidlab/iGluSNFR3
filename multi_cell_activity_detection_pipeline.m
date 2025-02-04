@@ -30,8 +30,8 @@
 %       - spike_train.m
 %       - spike_train_par.m
 %
-% Last modified: 2024-10-18 17:26 pm
-%                (added tophat filter for stack)
+% Last modified: 2025-02-03 12:43 am
+%                (modified tophat filter for stack; fixed bug for px.label)
 
 close all
 clear
@@ -47,9 +47,9 @@ foldername = '/PATH/TO/PROJECT/originals/';
 
 % path to other required functions
 addpath('./')
-addpath('../bfmatlab/')
-addpath('../MLspike/brick/')
-addpath('../MLspike/spikes/')
+addpath('./bfmatlab/')
+addpath('./MLspike/brick/')
+addpath('./MLspike/spikes/')
 
 loop_through_folder(foldername)
 
@@ -169,9 +169,10 @@ close(gcf)
 
 % tophat filter (background subtraction)
 tic;
-disp('Applying Tophat filter...')
-se = strel("cuboid",[24 24 20]);
-im_data = imtophat(im_data,se);
+disp('Getting background ...')
+se = strel("disk",100);
+im_data_1stFrame = imtophat(squeeze(im_data(:,:,1)),se);
+im_data_bkg = squeeze(im_data(:,:,1))-im_data_1stFrame;
 toc;
 
 % start timer
@@ -239,6 +240,8 @@ idx = num2cell(ind);
 px = repmat(struct('idx',1, 'df', [], 'dff_t', [], 'dff', [], 'ipt', []), length(idx), 1 );
 [px.idx] =idx{:};
 signal_raw = data1(ind,:)';
+% background subtraction
+signal_raw = signal_raw - repmat(im_data_bkg(ind)',ops.Nt,1);
 
 toc
 disp('Filtering pixels with small SNR...')
@@ -293,7 +296,7 @@ ylabel('Error of Linear Fit')
 % save figure
 saveas(gcf, strcat(ops.savedir,filesep, 'Fig5_BaselineDriftThreshold.fig'))
 saveas(gcf, strcat(ops.savedir,filesep, 'Fig5_BaselineDriftThreshold',ops.fig_format))
-% close(gcf)
+close(gcf)
 
 % remove ROI with Error of Linear Fit > threshold
 k = find(polyfit_error < ops.BL_drift_thres);
@@ -448,8 +451,7 @@ empty_cell = cell(length(ROI),1);
 [ROI.dfft] = empty_cell{:};
 [ROI.t] = empty_cell{:}; % non-repeating timing of events
 
-empty_cell = cell(length(px),1);
-[px.label] = empty_cell{:};
+[px.label] = deal(0);
 
 for n = 1:size(ROI,1)
     % find stats of corresponding pixels
@@ -515,18 +517,15 @@ while true
         
         % create new ROI
         ROI_0 = unique(vertcat(event_cluster(i).ROI)); % original ROIs
+        i = find(ismember(vertcat(event_cluster(:).ROI), ROI_0));
+        cluster_group(i) = n;
+
         if length(ROI_0) > 1 % grouping different ROIs
             ROI(end+1).Area = sum(vertcat(ROI(ROI_0).Area));
             ROI(end).PixelIdxList = vertcat(ROI(ROI_0).PixelIdxList);
             ROI(end).PixelList = vertcat(ROI(ROI_0).PixelList);
             ROI(end).Centroid = mean(ROI(end).PixelList);
             ROI = ROI_properties(ROI, length(ROI));
-            % 
-            % % relabel px.label
-            % ia = find(ismember(label, ROI_0));
-            % for k = 1:length(ia)
-            %     px(ia(k)).label = length(ROI);
-            % end
     
             % create new cluster
             event_cluster = cluster_events(ROI,event_cluster,length(ROI));
@@ -634,6 +633,8 @@ save_data()
 %%
 show_label_mask_with_text(event_cluster, ROI, ops)
 
+close all
+
 end
 
 %%
@@ -674,7 +675,12 @@ function ROI = ROI_properties(ROI, n)
         % timing of event
         [N,~] = histcounts(ROI(n).dfft,edges);
         N_w = conv(N, kernal, 'same'); % moving sum
-        [~, t] = findpeaks(N_w,'MinPeakHeight',1.5);
+        if ROI(n).Area <= 3
+            thres = 0.5;
+        else
+            thres = 1.5;
+        end
+        [~, t] = findpeaks(N_w,'MinPeakHeight',thres);
         % for each time point, find the temporal peak in ROI(n).df
         % it could be w points before/after t
         w = 2;
@@ -748,40 +754,6 @@ function edge = Gaussian_Derivative_Filter_padded(data, mode, thres)
             STD = std(edge);
             edge(edge<thres*STD)=0;
     end
-
-    toc
-end
-
-function edge = Gaussian_Derivative_Filter_padded_2nd(data, mode, thres)
-    tic;
-    disp('Applying 1st order Gaussian filter...')
-
-    % sigma for guassian filter
-    sigma_y = 2;
-    
-    % length of zero-padding
-    zeropad_len = 50;
-    
-    % zero-padding
-    edge = zero_padding(data, zeropad_len);
-    
-    % 1st Order Derivative 1D Gaussian filter, detects slopes in time dimension
-    edge = Gaussian_Derivative_Filter(edge, sigma_y);
-    
-    % remove zero-padding
-    edge = remv_zero_padding(edge, zeropad_len);
-    
-    % correct for direction of the slope
-    edge = -edge;
-    % 
-    % % thresholding to remove slow flucturations in signal
-    % switch mode
-    %     case 'absolute'
-    %         edge(edge<thres)=0;
-    %     case 'SD'
-    %         STD = std(edge);
-    %         edge(edge<thres*STD)=0;
-    % end
 
     toc
 end
