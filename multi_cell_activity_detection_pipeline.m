@@ -30,8 +30,8 @@
 %       - spike_train.m
 %       - spike_train_par.m
 %
-% Last modified: 2025-02-03 12:43 am
-%                (modified tophat filter for stack; fixed bug for px.label)
+% Last modified: 2025-03-07 16:48 am
+%                (Spike train classification)
 
 close all
 clear
@@ -43,13 +43,13 @@ if(~isdeployed)
 end
 
 % path to data folder
-foldername = '/PATH/TO/PROJECT/originals/';
+foldername = '../originals/';
 
 % path to other required functions
-addpath('./')
-addpath('./bfmatlab/')
-addpath('./MLspike/brick/')
-addpath('./MLspike/spikes/')
+addpath('./Scripts/')
+addpath('./Scripts/bfmatlab/')
+addpath('./Scripts/MLspike/brick/')
+addpath('./Scripts/MLspike/spikes/')
 
 loop_through_folder(foldername)
 
@@ -559,6 +559,17 @@ ops.messy_ROI = find(ratio>ops.ratio_thres);
 
 if ~isempty(ops.messy_ROI)
     warning(sprintf('Check ROI %03d \n',ops.messy_ROI'));
+end
+%% Spike train thresholding 
+ROI = ST_function(ROI);
+% adjust spike train detection parmaters (optional)
+ops = spike_train_par(ops);
+
+% add spike trains
+for i = 1:length(ROI)
+    if ROI(i).ST == 1
+       spike_train(i);
+    end 
 end
 
 %% plot signal for each ROI (overall)
