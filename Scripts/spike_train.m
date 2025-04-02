@@ -25,17 +25,30 @@ function spike_train(k)
         % get averaged signal of ROI
         idx = label == k(i);
         synapse_raw = mean(signal_raw(:,idx),2);
+        
 
         % use spike train method
         % calculate new baseline
+
         synapse_baseline  = sliding_window_filter(synapse_raw, ops.baseline_percentage, ops.sl_window_ST);
+        synapse_baseline = synapse_baseline - synapse_baseline(1);
         synapse_df = synapse_raw - synapse_baseline;
-        synapse_dfof = synapse_df./synapse_baseline;
+        normalised_signal = synapse_df ./ abs(synapse_df(1));
+
     
         % MLspike
-        [n, Ffit, ~, ~, ~, ~] = tps_mlspikes(synapse_df,ops.par);          
-        event_cluster(end+1).dff_t = find(n)';
+        % [n, Ffit, ~, ~, ~, ~] = tps_mlspikes(normalised_signal,ops.par);          
+        % event_cluster(end+1).dff_t = find(n)';
+        % synapse_dfof = Ffit-1;
+        % event_cluster(end).dff = synapse_dfof(event_cluster(end).dff_t)';
+
+        ops.par.a = max(normalised_signal)-1;
+        [n, Ffit, ~, ~, ~, ~] = tps_mlspikes(normalised_signal,ops.par); 
+        [pks, locs] = findpeaks (Ffit-1, 'MinPeakDistance',4, 'MinPeakHeight', (ops.par.a/2));
+        event_cluster(end+1).dff_t = locs;
+        synapse_dfof = Ffit-1;
         event_cluster(end).dff = synapse_dfof(event_cluster(end).dff_t)';
+
 
         % plot signal
         figure;
@@ -43,9 +56,9 @@ function spike_train(k)
 
         subplot(2,1,1) % df
         hold on
-        plot(ops.t, synapse_df)
+        plot(ops.t, normalised_signal)
         plot(ops.t, Ffit,'k')
-        ylabel('df')
+        ylabel('Normalised signal')
 
         subplot(2,1,2) % dfof
         hold on
@@ -56,7 +69,7 @@ function spike_train(k)
         % save figure
         saveas(gcf, strcat(ops.savedir_ROIpx,filesep, sprintf('px_ROI%03d_ST',k(i)),'.fig'))
         saveas(gcf, strcat(ops.savedir_ROIpx,filesep, sprintf('px_ROI%03d_ST',k(i)),ops.fig_format))
-        % close(gcf)
+        close(gcf)
 
         event_cluster(end).ROI = k(i);
         event_cluster(end).n_spikes = length(event_cluster(end).dff_t);
