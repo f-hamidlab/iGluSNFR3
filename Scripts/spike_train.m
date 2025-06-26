@@ -45,7 +45,7 @@ function spike_train(k)
         ops.par.a = max(normalised_signal)-1;
         [n, Ffit, ~, ~, ~, ~] = tps_mlspikes(normalised_signal,ops.par); 
         [pks, locs] = findpeaks (Ffit-1, 'MinPeakDistance',4, 'MinPeakHeight', (ops.par.a/2));
-        event_cluster(end+1).dff_t = locs;
+        event_cluster(end+1).dff_t = reshape(locs,1,[]);
         synapse_dfof = Ffit-1;
         event_cluster(end).dff = synapse_dfof(event_cluster(end).dff_t)';
 

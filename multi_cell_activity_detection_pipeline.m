@@ -30,8 +30,8 @@
 %       - spike_train.m
 %       - spike_train_par.m
 %
-% Last modified: 2025-03-07 16:48 am
-%                (Spike train classification)
+% Last modified: 2025-06-26 12:31 am
+%                (fixed bugs on event_stats)
 
 close all
 clear
@@ -43,7 +43,7 @@ if(~isdeployed)
 end
 
 % path to data folder
-foldername = '../originals/';
+foldername = '../../originals/test_data';
 
 % path to other required functions
 addpath('./Scripts/')
@@ -92,7 +92,7 @@ ops.sl_window_ST = 500; % [frame] for spike train
 
 % threshold for slope, below which the variation in intensity is ignored
 ops.m_mode = 'SD'; % 'SD' or 'absolute'
-ops.m_thres = 3; % or 20 for 'absolute'
+ops.m_thres = 4; % or 20 for 'absolute'
 ops.SNR_thres = 5;
 
 % threshold for removing signals with lot of curvatures in baseline
