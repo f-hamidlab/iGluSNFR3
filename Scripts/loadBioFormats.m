@@ -2,27 +2,30 @@
 % Loads data using bioformats toolbox and reshapes data.
 %
 % Author: Jane Ling (yan_to.ling@kcl.ac.uk)
-% Last updated: 2024-01-08 17:30
+% Last updated: 2025-02-14 12:40
 %
 % USAGE:
 % 1) [im_data, ops] = loadBioFormats(ops);
 % 2) [im_data, ops] = loadBioFormats(ops, verbose);
 %
 % INPUTS:
-%   - ops: (struct) ops.filename defining the path to image file
-%   - verbose: (bool) whether to pring information about dataset or not.
-%              (Default) false
+%   - ops 
+%       (struct) ops.filename defining the path to image file
+%   - verbose 
+%       (bool) whether to pring information about dataset or not.
+%       (Default) false
 %
 % OUTPUTS:
-%   - im_data: 
+%   - im_data
 %       (numeric) 5D matrix if dimension order starts with 'XY', singular
 %                 dimensions would be omitted.
 %       (cell array) interleaved frames otherwise
-%   - ops: (struct) parameters of the stack
+%   - ops
+%       (struct) parameters of the stack
 
 function [im_data, ops] = loadBioFormats(ops, varargin)
     
-    if nargin > 1
+    if nargin == 2
         verbose = varargin{1};
     else 
         verbose = 0;
@@ -32,7 +35,7 @@ function [im_data, ops] = loadBioFormats(ops, varargin)
     [~,~] = bfCheckJavaPath();   % added such that path to Bio-Formats Toolbox is know
     
     data = bfopen(ops.filename); % load data
-    
+
     im_data = data{1,1};
     im_data = im_data(:,1); % image data
     
@@ -62,12 +65,20 @@ function [im_data, ops] = loadBioFormats(ops, varargin)
         fprintf('Size of image = %d x %d. \nNumber of Z slices = %d. \nNumber of channels = %d. \nNumber of time points = %d. \n', ops.Nx, ops.Ny, ops.Nz, ops.Nc, ops.Nt)
         fprintf('Dimension order = %s  \n', ops.dimOrder)
     end
+
     % for z-stack
     if ops.Nz > 1
-        ops.sizeZ = double(omeMeta.getPixelsPhysicalSizeZ(ops.imageIndex).value(ome.units.UNITS.MICROMETER)); % [microns]
-        ops.z = (0:ops.Nz-1)*ops.sizeZ;
-        if verbose
-            fprintf('Voxel size = %.3f µm x %.3f µm x %.3f µm  \n', ops.sizeX, ops.sizeY, ops.sizeZ)
+        try
+            ops.sizeZ = double(omeMeta.getPixelsPhysicalSizeZ(ops.imageIndex).value(ome.units.UNITS.MICROMETER)); % [microns]
+            ops.z = (0:ops.Nz-1)*ops.sizeZ;
+            if verbose
+                fprintf('Voxel size = %.3f µm x %.3f µm x %.3f µm  \n', ops.sizeX, ops.sizeY, ops.sizeZ)
+            end
+        catch
+            if verbose
+                fprintf('Pixel size = %.3f µm x %.3f µm  \n', ops.sizeX, ops.sizeY)
+            end
+            warning('Could not read sizeZ from omeMeta.')
         end
     else
         if verbose
@@ -87,7 +98,7 @@ function [im_data, ops] = loadBioFormats(ops, varargin)
             warning('Dimension order may be incorrect.')
         end
     end
-
+        
     % reshaping
     if strcmp(ops.dimOrder(1:2),'XY') 
         im_data = cell2mat(im_data);

@@ -1,7 +1,7 @@
-function peak_inds = findpeaks_2d(X, Z, MinPeakHeight)
+function peak_inds = findpeaks_2d(Z, MinPeakHeight)
     % Find dimensions to set up loop
-    xdim = size(X,1);
-    ydim = size(X,2);
+    xdim = size(Z,1);
+    ydim = size(Z,2);
     
     % Loop through x dimension to find peaks of each row
     xpeaks = zeros(size(Z));
@@ -23,4 +23,8 @@ function peak_inds = findpeaks_2d(X, Z, MinPeakHeight)
     
     % Find indices that were peaks in both x and y
     peak_inds = xpeaks.*(xwidths>1)+ypeaks.*(ywidths>1) == 2;
+
+    if sum(peak_inds,"all") == 0
+        peak_inds = xpeaks + ypeaks == 2; % no min. requirement on width of peak
+    end
 end

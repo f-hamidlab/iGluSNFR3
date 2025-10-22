@@ -18,14 +18,15 @@ function ops = spike_train_par(ops)
     %           .tau    decay time
     %           .spikerate
     %           .drift  subfield 'method' is 'state' or 'basis functions'
-    par.dt = 0.0100;
+    par.dt = dt;
     par.F0 = [0.9 1.05];
-    par.a = 0.75;  
-    par.tau = 0.0629;
+    par.a = 0.3;  % 0.75
+    par.tau = 0.0629; % 0.0629
     par.drift.parameter = 0.02;
     par.algo.cmax = 1; 
     par.algo.nc = 50;  
     par.algo.nb = 50; 
-    
+
+   
     ops.par = par;
 end
