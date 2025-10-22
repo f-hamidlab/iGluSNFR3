@@ -1,0 +1,18 @@
+function [signal_baseline, signal_df, signal_dfof, signal_dfof_movemean] = signal_processing(signal_raw, baseline_percentage, sl_window, experiment_type)
+    switch experiment_type
+        case "spontaneous"
+            signal_baseline = sliding_window_filter(signal_raw, baseline_percentage, sl_window);
+            signal_df = signal_raw - signal_baseline;
+            signal_baseline = signal_baseline + median(signal_df,1);
+            signal_df = signal_df - median(signal_df,1);
+            signal_dfof = signal_df./signal_baseline;
+            signal_dfof_movemean = movmean(signal_dfof, 5, 1); % window of 5
+        case "evoked"
+            mask.signal_baseline = zeros(size(mask.signal_raw));
+            mask.signal_baseline(1:f1) = prctile(mask.signal_raw(1:f1),ops.baseline_percentage*100);
+            mask.signal_baseline(f2:end) = prctile(mask.signal_raw(f2:end),ops.baseline_percentage*100);
+            % interpolation for frames inbetween
+            mask.signal_baseline(f1:f2) = interp1([f1 f2], [mask.signal_baseline(f1) mask.signal_baseline(f2)], f1:f2);
+    end
+
+end

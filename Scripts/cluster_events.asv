@@ -51,11 +51,6 @@ function event_cluster = cluster_events(ROI,event_cluster,n)
         y_loc = PixelList(i,2)-yLim(1)+1;
         df_map_all(y_loc, x_loc) =  max(signal_df(:,idx(i)));
     end
-    
-    % for debugging
-    % if n == 67
-    %     keyboard
-    % end
 
     if ROI(n).Area == 1 % only one pixel
         peak_x = PixelList(:,2);
@@ -147,10 +142,8 @@ function event_cluster = cluster_events(ROI,event_cluster,n)
         event_cluster(end+1).ROI = n;
         event_cluster(end).x = PixelList(:,1);
         event_cluster(end).y = PixelList(:,2);
-        event_cluster(end).x_weighted = event_cluster(end).x;
-        event_cluster(end).y_weighted = event_cluster(end).y;
         event_cluster(end).dff_t = ROI(n).t;
-        event_cluster(end).dff = reshape(signal_dfof(ROI(n).t,idx),1,[]);
+        event_cluster(end).dff = signal_dfof(ROI(n).t,idx);
         event_cluster(end).n_spikes = length(ROI(n).t);
         event_cluster(end).ST = 0;
         event_cluster(end).dfof = signal_dfof(:, idx);
@@ -161,14 +154,12 @@ function event_cluster = cluster_events(ROI,event_cluster,n)
         event_cluster(end+1).ROI = n;
         event_cluster(end).x = peak_x;
         event_cluster(end).y = peak_y;
-        event_cluster(end).x_weighted = event_cluster(end).x;
-        event_cluster(end).y_weighted = event_cluster(end).y;
         event_cluster(end).dff_t = peak_t;
         event_cluster(end).n_spikes = 1;
         event_cluster(end).ST = 0;
 
         % calculate signal for all pixels in the cluster
-        [~, ~, cluster_dfof, ~, ~] = signal_processing(sum(signal_raw(:, idx),2), ops, ops.experiment_type);
+        [~, ~, cluster_dfof, ~, ~] = signal_processing(sum(signal_raw(:, idx),2), ops);
         event_cluster(end).dfof = cluster_dfof;
 
         event_cluster(end).dff = cluster_dfof(peak_t);
@@ -208,21 +199,20 @@ function event_cluster = cluster_events(ROI,event_cluster,n)
             
             grid_size = 3; % 3x3
             r = floor(grid_size/2);
-            
-            x = max([1,x_weighted-r]):min([x_weighted+r, ops.Nx]);
-            y = max([1,y_weighted-r]):min([y_weighted+r, ops.Ny]);
-            [X,Y] = meshgrid(x,y);
+
             idx_centre = sub2ind([ops.Ny, ops.Nx], ...
-                         reshape(Y,1,[]), ...
-                         reshape(X,1,[]));
+                         y_weighted-r:y_weighted+r, ...
+                         x_weighted-r:x_weighted+r);
             [~, px_centre] = intersect(ind, idx_centre,'stable');
             
             if max(T) == 1
                 % calculate signal for all pixels in the cluster
-                [~, cluster_df, cluster_dfof, cluster_dfof_movemean, cluster_edge] = signal_processing(sum(signal_raw(:, idx),2), ops, ops.experiment_type);
+                [~, cluster_df, cluster_dfof, cluster_dfof_movemean, cluster_edge] = signal_processing(sum(signal_raw(:, idx),2), ops);
                 
                 event_cluster(end).dfof = cluster_dfof;
-                px = struct('idx', 1, 'df', [], 'dff_t', [], 'dff', [], 'ipt', [], 'dff_from_ipt', []); % define empty structure
+                
+                px = struct(); % define empty structure
+                px.dff_t = event_cluster(end).dff_t;
                 px = px_properties(px, ops, cluster_edge, cluster_df, cluster_dfof, cluster_dfof_movemean);
                 
                 event_cluster(end).dff_t = px.dff_t;
@@ -233,7 +223,7 @@ function event_cluster = cluster_events(ROI,event_cluster,n)
 
             else
                 % calculate signal for all pixels in the cluster
-                [~, ~, cluster_dfof, ~, ~] = signal_processing(sum(signal_raw(:, px_centre),2), ops, ops.experiment_type);
+                [~, ~, cluster_dfof, ~, ~] = signal_processing(sum(signal_raw(:, px_centre),2), ops);
                 event_cluster(end).dfof = cluster_dfof;
 
                 event_cluster(end).dff = cluster_dfof(event_cluster(end).dff_t);
@@ -263,8 +253,6 @@ function event_cluster = cluster_events(ROI,event_cluster,n)
         plot(ax_trace, ops.t, event_cluster(c).dfof)
         scatter(ax_trace, ops.t(event_cluster(c).dff_t), event_cluster(c).dff)
     end
-    ylabel(ax_trace, '\DeltaF/F')
-    xlabel(ax_trace, 'Time [s]')
     
 
     % save figure

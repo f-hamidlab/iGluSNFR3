@@ -2,51 +2,21 @@
 % Threshold to identify spike trains within data set
 %
 % USAGE:
-% 1) ROI = ST_function(ROI)
+% 1) ROI = ST_function(ROI, ops)
 %
 % INPUTS:
 %     - ROI - ROI data as structure array
 
-function ROI = ST_function(ROI)
+function ROI = ST_function(ROI, ops)
     
-    P = arrayfun(@(x) getNoiseLevel(x.df, x.t),ROI,'UniformOutput',false);
-
-    function width = getNoiseLevel(noise_signal, t) % Determine width of spike train 
-        % Defining peaks 
-        smoothed_signal = smoothdata(noise_signal,"gaussian", 10);
-        amplitude = smoothed_signal(t); 
-        a = amplitude / 2; % Midpoint of peak
-        all_signal = zeros(1,length(smoothed_signal)); 
-        for i = 1 : length(t)
-            x_start = find(smoothed_signal(1:t(i)) < a(i),1,'last'); % Start point of peak
-            x_end = find(smoothed_signal(t(i):end) < a(i),1,'first');
-            x_end = x_end+t(i)-1; % End point of peak 
-            all_signal(x_start:x_end) = 1; % All points within peak = 1
-        end
-        % Determiningthe gap between peaks
-        f = find(diff([0,~all_signal,0] == 1)); 
-        s = f(1:2:end-1); % Start of the gap
-        l = f(2:2:end)-s; % End of the gap 
-
-        % If the gap between 2 peaks is < 30 = spike train 
-        for i = 1:length(l)
-            if  l(i) < 30
-                all_signal(s(i):(s(i)+l(i))) = 1;
-            end 
-        end 
-        f = find(diff([0,all_signal,0] == 1));
-        s = f(1:2:end-1);  
-        y = f(2:2:end)-s; 
-        width = max(y); % Establishing widest spike train 
-    end
+    P = arrayfun(@(x) getNoiseLevel(x.df, x.t, ops.ST),ROI,'UniformOutput',false);  
     [ROI(:).ST_width] = P{:};
-
 
     all_peaks_num = zeros(size(ROI,1),1); % Determine number of peaks in spike train
     for i = 1:length(ROI)
-        sig = zeros (1,3000);
+        sig = zeros (1,ops.Nt);
         sig(ROI(i).t) = 1;
-        a = movsum(sig, 50); % Set to 50 frames 
+        a = movsum(sig, ops.ST.sumOfPeak_window);
         peak_num = (max(a)); % Number of peaks within the window 
         all_peaks_num(i) = peak_num;
     end 
@@ -66,3 +36,31 @@ function ROI = ST_function(ROI)
 
 end 
 
+function width = getNoiseLevel(noise_signal, t, ST) % Determine width of spike train 
+    % Defining peaks 
+    smoothed_signal = smoothdata(noise_signal,"gaussian", ST.gaussian_window);
+    amplitude = smoothed_signal(t); 
+    a = amplitude / 2; % Midpoint of peak
+    all_signal = zeros(1,length(smoothed_signal)); 
+    for i = 1 : length(t)
+        x_start = find(smoothed_signal(1:t(i)) < a(i),1,'last'); % Start point of peak
+        x_end = find(smoothed_signal(t(i):end) < a(i),1,'first');
+        x_end = x_end+t(i)-1; % End point of peak 
+        all_signal(x_start:x_end) = 1; % All points within peak = 1
+    end
+    % Determiningthe gap between peaks
+    f = find(diff([0,~all_signal,0] == 1)); 
+    s = f(1:2:end-1); % Start of the gap
+    l = f(2:2:end)-s; % End of the gap 
+
+    % If the gap between 2 peaks is < 30 = spike train 
+    for i = 1:length(l)
+        if  l(i) < ST.gap_thres
+            all_signal(s(i):(s(i)+l(i))) = 1;
+        end 
+    end 
+    f = find(diff([0,all_signal,0] == 1));
+    s = f(1:2:end-1);  
+    y = f(2:2:end)-s; 
+    width = max(y); % Establishing widest spike train 
+end
