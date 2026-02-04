@@ -78,6 +78,7 @@ ops.plot_ROI_px_signal = false; % plot signal for each ROI (all pixels)
 % additional output format for figures
 ops.fig_format = '.png';
 ops.close_fig = true; % close figure after saving
+ops.visualize = true; % set to false to skip figure generation (faster)
 
 % sliding window filter
 ops.baseline_percentage = 0.2; % [0-1]
@@ -588,7 +589,6 @@ disp('Screening for events...')
 
 % use parallel computing
 parfor i = 1:size(signal_raw,2) % for each pixel
-    disp(i)
     % TODO
     px_edge = signal_edge(:,i);
     px_df = signal_df(:,i);
