@@ -1,8 +1,8 @@
 %% cluster_events
 % cluster events in ROI
 %
-% Last updated: 2025-02-04 14:37
-%               (fixed PixelList)
+% Last updated: 2026-02-03 15:29
+%               (added ops.plot_pxMap to toggle visualization of pixel map for each ROI)
 %
 % USAGE:
 % 1) event_cluster = cluster_events(ROI,event_cluster,n)
@@ -134,13 +134,15 @@ function event_cluster = cluster_events(ROI,event_cluster,n)
     end
     
     % create axes for subplots
-    n_row = 2;
-    n_col = 2;
-    ax_df_map = subplot(n_row, n_col, 1);
-    ax_trace = subplot(n_row, n_col, [3,4]);
+    if ops.plot_pxMap
+        n_row = 2;
+        n_col = 2;
+        ax_df_map = subplot(n_row, n_col, 1);
+        ax_trace = subplot(n_row, n_col, [3,4]);
 
-    hold(ax_df_map,"on")
-    imagesc(ax_df_map, x, y, df_map_all)
+        hold(ax_df_map,"on")
+        imagesc(ax_df_map, x, y, df_map_all)
+    end
 
 
     if ROI(n).Area == 1  % only one pixel
@@ -239,37 +241,41 @@ function event_cluster = cluster_events(ROI,event_cluster,n)
                 event_cluster(end).dff = cluster_dfof(event_cluster(end).dff_t);
             end
 
-            scatter(ax_df_map, event_cluster(end).x, event_cluster(end).y,'red',"x")
-            scatter(ax_df_map, event_cluster(end).x_weighted, event_cluster(end).y_weighted,'red',"o")
+            if ops.plot_pxMap
+                scatter(ax_df_map, event_cluster(end).x, event_cluster(end).y,'red',"x")
+                scatter(ax_df_map, event_cluster(end).x_weighted, event_cluster(end).y_weighted,'red',"o")
+            end
         end      
 
     end
 
-    axes(ax_df_map); %set the current axes
-    xlim(ax_df_map, xLim)
-    ylim(ax_df_map, yLim)
-    set(ax_df_map, 'YDir','reverse')
-    title(ax_df_map, sprintf('ROI: %03d, %01d clusters', n, n_cluster_ROI))
-    xlabel(ax_df_map, 'X [px]')
-    ylabel(ax_df_map, 'Y [px]')
-    axis image
+    if ops.plot_pxMap
+        axes(ax_df_map); %set the current axes
+        xlim(ax_df_map, xLim)
+        ylim(ax_df_map, yLim)
+        set(ax_df_map, 'YDir','reverse')
+        title(ax_df_map, sprintf('ROI: %03d, %01d clusters', n, n_cluster_ROI))
+        xlabel(ax_df_map, 'X [px]')
+        ylabel(ax_df_map, 'Y [px]')
+        axis image
 
-    % plot traces
-    axes(ax_trace); %set the current axes
-    hold(ax_trace,"on")
-    clusters = find([event_cluster.ROI] == n);
-    for i = 1:length(clusters)
-        c = clusters(i);
-        plot(ax_trace, ops.t, event_cluster(c).dfof)
-        scatter(ax_trace, ops.t(event_cluster(c).dff_t), event_cluster(c).dff)
+        % plot traces
+        axes(ax_trace); %set the current axes
+        hold(ax_trace,"on")
+        clusters = find([event_cluster.ROI] == n);
+        for i = 1:length(clusters)
+            c = clusters(i);
+            plot(ax_trace, ops.t, event_cluster(c).dfof)
+            scatter(ax_trace, ops.t(event_cluster(c).dff_t), event_cluster(c).dff)
+        end
+        ylabel(ax_trace, '\DeltaF/F')
+        xlabel(ax_trace, 'Time [s]')
+        
+
+        % save figure
+        saveas(gcf, strcat(ops.savedir_ROIpxMap,filesep, sprintf('pxMap_ROI%03d',n),'.fig'))
+        saveas(gcf, strcat(ops.savedir_ROIpxMap,filesep, sprintf('pxMap_ROI%03d',n),ops.fig_format))
+        clf(gcf)
     end
-    ylabel(ax_trace, '\DeltaF/F')
-    xlabel(ax_trace, 'Time [s]')
-    
-
-    % save figure
-    saveas(gcf, strcat(ops.savedir_ROIpxMap,filesep, sprintf('pxMap_ROI%03d',n),'.fig'))
-    saveas(gcf, strcat(ops.savedir_ROIpxMap,filesep, sprintf('pxMap_ROI%03d',n),ops.fig_format))
-    clf(gcf)
 
 end
