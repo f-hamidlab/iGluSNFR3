@@ -1,3 +1,22 @@
+%% Area3_1
+% Post-processing and quality control script for Area 3.1 dataset
+%
+% DESCRIPTION:
+%   Example post-analysis workflow demonstrating:
+%   - Spike train parameter configuration
+%   - Manual addition of missed spike trains
+%   - Removal of spurious ROIs (noise only)
+%   - Manual event editing (add/remove individual spikes)
+%   - Statistics calculation and visualization
+%   - Data export
+%
+% NOTES:
+%   This is a dataset-specific example script.
+%   Modify ROI indices and spike times for your own dataset.
+%   All base workspace variables (event_cluster, ROI, ops) must be pre-loaded
+%
+% Last updated: 2026-02-03 15:30
+
 % adjust spike train detection parameters (optional)
 ops = spike_train_par(ops);
 

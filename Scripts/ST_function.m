@@ -1,11 +1,28 @@
-%% ST_function 
-% Threshold to identify spike trains within data set
+%% ST_function
+% Applies spike train classification threshold to ROI events
+%
+% DESCRIPTION:
+%   Determines which ROIs contain true spike trains versus noise based on
+%   spike width and peak count characteristics. Applies a linear threshold
+%   to classify ROIs as having valid spike trains.
 %
 % USAGE:
-% 1) ROI = ST_function(ROI, ops)
+%   1) ROI = ST_function(ROI, ops)
 %
 % INPUTS:
-%     - ROI - ROI data as structure array
+%   - ROI: (struct) ROI data as structure array
+%   - ops: (struct) options and parameters including .ST field with spike train settings
+%
+% OUTPUTS:
+%   - ROI: (struct) updated ROI structure with added fields:
+%       .ST_width: spike train width measure
+%       .ST_NoP: number of peaks in spike train window
+%       .ST: (logical) classification as true spike train
+%
+% NOTES:
+%   Prints total count of ROIs classified as having spike trains
+%
+% Last updated: 2026-02-03 15:30
 
 function ROI = ST_function(ROI, ops)
     

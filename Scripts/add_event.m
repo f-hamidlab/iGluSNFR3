@@ -1,16 +1,29 @@
 %% add_event
-% add event for ROI n at time t
+% Adds manually-specified event(s) to an ROI
 %
-% Last updated: 2024-02-20 15:28
-%               (evalin)
+% DESCRIPTION:
+%   Inserts event time point(s) into an ROI's event list and re-clusters all
+%   events. Useful for adding missed true positives.
 %
 % USAGE:
-% 1) add_event(n, t)
+%   1) add_event(n, t)
+%   2) add_event(n, [t1, t2, t3])  % multiple times
 %
 % INPUTS:
 %   - n: (int) index of ROI
-%   - t: (double) timepoint of event to be added, single number or
-%     array, unit: [s]
+%   - t: (numeric) time point(s) of event(s) to add, unit: [s]
+%
+% OUTPUTS:
+%   Updates base workspace variables:
+%   - event_cluster: updated with re-clustered events for ROI n
+%   - ROI: updated ROI structure with event times added
+%
+% NOTES:
+%   Accesses base workspace variables: event_cluster, ROI, ops, ind, signal_df, signal_dfof
+%   Automatically re-clusters all events after addition
+%
+% Last updated: 2024-02-20 15:28
+%   Modified to use evalin for base workspace access
 
 function add_event(n, t)
     

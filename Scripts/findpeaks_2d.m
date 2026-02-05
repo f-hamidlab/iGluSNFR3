@@ -1,3 +1,22 @@
+%% findpeaks_2d
+% Identifies 2D peak locations in a matrix using row and column-wise analysis
+%
+% DESCRIPTION:
+%   Detects peaks in both x and y dimensions independently and returns indices
+%   of locations that are peaks in both dimensions.
+%
+% USAGE:
+%   1) peak_inds = findpeaks_2d(Z, MinPeakHeight)
+%
+% INPUTS:
+%   - Z: (numeric) 2D matrix to analyze
+%   - MinPeakHeight: (numeric) minimum peak height threshold
+%
+% OUTPUTS:
+%   - peak_inds: (logical) binary matrix indicating peak locations
+%
+% Last updated: 2026-02-03 15:30
+
 function peak_inds = findpeaks_2d(Z, MinPeakHeight)
     % Find dimensions to set up loop
     xdim = size(Z,1);

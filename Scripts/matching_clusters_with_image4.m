@@ -1,3 +1,32 @@
+%% matching_clusters_with_image4
+% Matches synaptic clusters across trials with image registration/alignment
+%
+% DESCRIPTION:
+%   Extended version of matching_clusters that additionally performs image-based
+%   registration/alignment across trials before spatial clustering. Loads processed
+%   data from multiple experiments and matches detected events based on spatial
+%   proximity with image registration refinement.
+%
+% USAGE:
+%   1) matching_clusters_with_image4(foldername)
+%
+% INPUTS:
+%   - foldername: (string) root folder containing multiple 'processed_data.mat' files
+%       (searches recursively through subdirectories)
+%
+% OUTPUTS:
+%   - Figures showing:
+%       .ClusterMatchingFig2_Distribution: scatter plot of event coordinates with registration
+%       .ClusterMatchingFig3_Histogram: histogram of cluster sizes
+%       .ClusterMatchingFig4_*: additional matching and alignment statistics
+%   - Figures saved to foldername with .fig and image formats
+%
+% NOTES:
+%   Distance threshold: 3 pixels for cluster matching
+%   Includes image registration step for coordinate alignment across trials
+%
+% Last updated: 2026-02-03 15:30
+
 function matching_clusters_with_image4(foldername)
     filelist = dir(strcat(foldername,filesep,'**',filesep,'processed_data.mat'));
     N_trial = length(filelist);

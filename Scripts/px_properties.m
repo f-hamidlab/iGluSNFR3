@@ -1,3 +1,34 @@
+%% px_properties
+% Calculates event detection properties for individual pixels
+%
+% DESCRIPTION:
+%   Analyzes temporal dynamics of individual pixels including peak slopes,
+%   signal variability, and event timing. Identifies peak times and amplitudes
+%   using derivative-based peak detection with noise estimation.
+%
+% USAGE:
+%   1) px = px_properties(px, ops, px_edge, px_df, px_dfof, px_dfof_movemean)
+%
+% INPUTS:
+%   - px: (struct) pixel data structure
+%   - ops: (struct) options and parameters
+%   - px_edge: (numeric) temporal derivative of pixel signal (edge detection)
+%   - px_df: (numeric) delta F signal for pixel
+%   - px_dfof: (numeric) delta F/F signal for pixel
+%   - px_dfof_movemean: (numeric) moving average of delta F/F
+%
+% OUTPUTS:
+%   - px: (struct) updated pixel structure with properties:
+%       .slope_pk: peak slope magnitudes
+%       .slope_t: times of peak slopes
+%       .STD: signal noise level (std of non-spike regions)
+%       .dff_t: times of detected events
+%       .dff: amplitudes of detected events
+%       .df: delta F amplitudes
+%       .SNR: signal-to-noise ratio
+%
+% Last updated: 2026-02-03 15:30
+
 function px = px_properties(px, ops, px_edge, px_df, px_dfof, px_dfof_movemean)
     [pks,locs] = findpeaks(px_edge);
     % skip the first and last 5 frames

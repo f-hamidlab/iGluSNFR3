@@ -1,12 +1,35 @@
 %% event_stats
-% calculates event statistics
+% Calculates comprehensive statistics for detected synaptic events
 %
-% USAGE: 
-% 1) stats = event_stats(event_cluster, ops)
+% DESCRIPTION:
+%   Computes event statistics including total event counts, amplitude distributions,
+%   temporal synchronization patterns, and stimulus response metrics for evoked
+%   activity experiments.
+%
+% USAGE:
+%   1) [stats, event_cluster] = event_stats(event_cluster, ops)
 %
 % INPUTS:
-%     - event_cluster: (struct) synapse data as structure array
-%     - ops: (struct) options and parameters
+%   - event_cluster: (struct) synapse data as structure array containing detected events
+%   - ops: (struct) options and parameters including:
+%       .Nt: total number of time points
+%       .t: time vector
+%       .savedir: directory for saving figures
+%       .fig_format: figure file format
+%       .experiment_type: 'spontaneous' or 'evoked'
+%       .n_stim: (evoked) number of stimulation trials
+%       .stim_pk_search_range: (evoked) time indices for stimulus response window
+%
+% OUTPUTS:
+%   - stats: (struct) computed statistics including:
+%       .N_syn: number of synapses/ROIs
+%       .n_spikes_total: total number of events
+%       .dff_all: all spike amplitudes
+%       .dfft_all: temporal indices of spikes
+%       .stim_response_hiscount: (evoked) response counts per stimulus
+%   - event_cluster: (struct) updated event_cluster with stimulus response data (evoked)
+%
+% Last updated: 2026-02-03 15:30
 
 function [stats, event_cluster] = event_stats(event_cluster, ops)
 

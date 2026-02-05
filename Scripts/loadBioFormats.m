@@ -1,27 +1,30 @@
-%% [im_data, ops] = loadBioFormats(ops, varargin)
-% Loads data using bioformats toolbox and reshapes data.
+%% loadBioFormats
+% Loads microscopy image data using Bio-Formats toolbox and reshapes to analysis dimensions
 %
-% Author: Jane Ling (yan_to.ling@kcl.ac.uk)
-% Last updated: 2025-02-14 12:40
+% DESCRIPTION:
+%   Reads image files in any Bio-Formats compatible format (.czi, .nd2, .tif, etc.)
+%   using the Java-based Bio-Formats library. Automatically detects and reshapes
+%   multi-dimensional data according to the format's dimension order.
 %
 % USAGE:
-% 1) [im_data, ops] = loadBioFormats(ops);
-% 2) [im_data, ops] = loadBioFormats(ops, verbose);
+%   1) [im_data, ops] = loadBioFormats(ops)
+%   2) [im_data, ops] = loadBioFormats(ops, verbose)
 %
 % INPUTS:
-%   - ops 
-%       (struct) ops.filename defining the path to image file
-%   - verbose 
-%       (bool) whether to pring information about dataset or not.
-%       (Default) false
+%   - ops: (struct) must contain .filename with full path to image file
+%   - verbose: (logical, optional) print detailed dataset information (default: false)
 %
 % OUTPUTS:
-%   - im_data
-%       (numeric) 5D matrix if dimension order starts with 'XY', singular
-%                 dimensions would be omitted.
-%       (cell array) interleaved frames otherwise
-%   - ops
-%       (struct) parameters of the stack
+%   - im_data: (numeric or cell) image data:
+%       * Numeric: 5D matrix if dimension order starts with 'XY'
+%       * Cell array: interleaved frames for other dimension orders
+%   - ops: (struct) updated with dataset parameters including dimensions, metadata
+%
+% NOTES:
+%   Requires Bio-Formats Toolbox and proper Java path configuration.
+%   Author: Jane Ling (yan_to.ling@kcl.ac.uk)
+%
+% Last updated: 2025-02-14 12:40
 
 function [im_data, ops] = loadBioFormats(ops, varargin)
     

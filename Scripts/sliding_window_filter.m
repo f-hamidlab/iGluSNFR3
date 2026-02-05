@@ -1,4 +1,23 @@
-%% Sliding window filter
+%% sliding_window_filter
+% Calculates baseline using sliding window percentile filtering
+%
+% DESCRIPTION:
+%   Applies a sliding window filter to estimate baseline fluorescence by
+%   calculating the median of a specified percentile of values within each window.
+%
+% USAGE:
+%   1) baseline_pc_median = sliding_window_filter(data, baseline_percentage, window)
+%
+% INPUTS:
+%   - data: (numeric) input signal (time x pixels)
+%   - baseline_percentage: (numeric) fraction of values to use for baseline (0-1)
+%   - window: (numeric) window size for sliding calculation
+%
+% OUTPUTS:
+%   - baseline_pc_median: (numeric) estimated baseline signal
+%
+% Last updated: 2026-02-03 15:30
+
 function baseline_pc_median = sliding_window_filter(data, baseline_percentage, window)
     tic;
     disp('Applying sliding window filter...')

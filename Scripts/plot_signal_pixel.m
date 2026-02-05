@@ -1,24 +1,32 @@
 %% plot_signal_pixel
-% Plot intensity of a pixel over time, with subplots of 
-% 1) raw signal and baseline
-% 2) delta F
-% 3) delta F over F, with detected peaks
-% 4) rising and falling slopes, with detected peaks
+% Visualizes temporal signal dynamics for individual or multiple pixels
 %
-% Pixel can be defined by one of the followings:
-% 1) pixel number in structure px
-%    e.g. k = 393;
-% 2) linear index of pixel location
-%    e.g. k = find(ind == 66817);
-% 3) xy index of pixel location
-%    e.g. k = find(ind==sub2ind([ops.Ny, ops.Nx], y, x));
-%         where x, y are the coordinates of the pixel
+% DESCRIPTION:
+%   Generates multi-panel plots for selected pixels showing: raw signal with baseline,
+%   delta F, delta F/F with detected peaks, and rising/falling slopes. Pixels can be
+%   selected by index, linear index, or xy coordinates.
 %
-% k can also be an array
-% e.g. k = [find(ind == 6098), ...
-%          find(ind==sub2ind([ops.Ny, ops.Nx],139, 337)), ... % signal
-%          find(ind == 179337), ...% noise
-%          find(ind == 247676)]; % spike train
+% USAGE:
+%   1) plot_signal_pixel()  % visualizes pixels defined by variable k
+%
+% INPUTS:
+%   - Variable k (within script): pixel selection, can be:
+%       * Single pixel index: k = 393
+%       * Linear pixel index: k = find(ind == 66817)
+%       * XY pixel coordinates: k = find(ind == sub2ind([ops.Ny, ops.Nx], y, x))
+%       * Multiple pixels: k = [idx1, idx2, idx3]
+%
+% OUTPUTS:
+%   - Figure(s) with 4 subplots per pixel showing:
+%       1. Raw signal + baseline
+%       2. Delta F
+%       3. Delta F/F + detected peaks
+%       4. Rising/falling slopes + detected peaks
+%
+% NOTES:
+%   Accesses base workspace variables: px, ops, signal_raw, signal_baseline, signal_df, etc.
+%
+% Last updated: 2026-02-03 15:30
 
 %% Defining pixel to be plotted
 k = find(ind == 2247);

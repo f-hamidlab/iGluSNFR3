@@ -1,11 +1,28 @@
 %% spike_train_par
-% defines parameter for spike train analysis
+% Configures parameters for MLspike spike train analysis
 %
-% USAGE: 
-% 1) ops = spike_train_par(ops)
+% DESCRIPTION:
+%   Sets up parameters for the MLspike (Markov chain Monte Carlo spike inference)
+%   algorithm including baseline fluorescence, spike amplitude, decay time, and
+%   drift correction settings.
+%
+% USAGE:
+%   1) ops = spike_train_par(ops)
 %
 % INPUTS:
-%     - ops: (struct) options and parameters
+%   - ops: (struct) options and parameters, must contain .fs (sampling frequency)
+%
+% OUTPUTS:
+%   - ops: (struct) updated with .par field containing MLspike parameters:
+%       .par.dt: frame acquisition time
+%       .par.F0: baseline fluorescence range [min, max]
+%       .par.a: spike amplitude in Delta F
+%       .par.tau: exponential decay time constant
+%       .par.spikerate: baseline spike rate
+%       .par.drift: drift correction parameters
+%       .par.algo: algorithm settings (cmax, nc, nb)
+%
+% Last updated: 2026-02-03 15:30
 
 function ops = spike_train_par(ops)
     % parameters for spike train 
