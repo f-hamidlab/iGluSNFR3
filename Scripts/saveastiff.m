@@ -1,3 +1,32 @@
+%% saveastiff
+% Saves 2D or 3D arrays as TIFF image files with compression options
+%
+% DESCRIPTION:
+%   Exports numeric arrays as GeoTIFF or standard TIFF files with support for
+%   color images, multiple compression types, and appending to existing files.
+%   Useful for saving microscopy images, masks, and other scientific imaging data.
+%
+% USAGE:
+%   1) res = saveastiff(data, path)
+%   2) res = saveastiff(data, path, options)
+%
+% INPUTS:
+%   - data: (numeric) array to save (2D or 3D)
+%   - path: (string) file path for output TIFF
+%   - options: (struct) optional parameters:
+%       .color: true/false - save as RGB color image
+%       .compress: 'no' (default), 'lzw', 'jpeg', 'adobe'
+%       .jpegquality: 1-100 quality for JPEG compression
+%       .message: true (default) / false - show status messages
+%       .append: true/false - append to existing file
+%       .overwrite: true/false - overwrite existing file
+%       .big: true/false - use 64-bit addressing (>4GB files)
+%
+% OUTPUTS:
+%   - res: (numeric) 0 if successful, positive error code if failed
+%
+% Last updated: 2026-02-03 15:30
+
 function res = saveastiff(data, path, options)
 % options.color
 %   : true or FALSE

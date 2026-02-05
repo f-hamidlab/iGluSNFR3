@@ -1,11 +1,27 @@
 %% ROI_pxMap_allTime
-% plots map of delta F for ROI n at each time point of event
+% Generates pixel-level signal maps for all event times in an ROI
+%
+% DESCRIPTION:
+%   Creates a figure with subplots showing the delta F signal spatial distribution
+%   at each detected event time within an ROI. Useful for visualizing the spatial
+%   extent and temporal dynamics of synaptic activity.
 %
 % USAGE:
-% 1) ROI_pxMap_allTime(n)
+%   1) ROI_pxMap_allTime(n)
 %
 % INPUTS:
-%   - n: (int) index of ROI
+%   - n: (int) index of ROI to visualize
+%
+% OUTPUTS:
+%   - Figure with subplots (one per event time)
+%   - Figures saved to ops.savedir_ROIpx directory
+%   - No variables returned
+%
+% NOTES:
+%   Accesses base workspace variables: ROI, ops, ind, signal_df, signal_dfof
+%   Skips visualization for single-pixel ROIs
+%
+% Last updated: 2026-02-03 15:30
 
 function ROI_pxMap_allTime(n)
 

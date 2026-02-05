@@ -1,3 +1,37 @@
+%% mask_properties_evoked_overall
+% Calculates event detection properties for overall spatial mask in evoked experiments
+%
+% DESCRIPTION:
+%   Analyzes temporal dynamics of the overall detected region-of-interest mask
+%   in evoked activity experiments. Identifies peak times, amplitudes, and response
+%   characteristics using derivative-based peak detection with noise estimation.
+%   Similar to px_properties but operates on entire mask rather than individual pixels.
+%
+% USAGE:
+%   1) mask = mask_properties_evoked_overall(mask, ops)
+%
+% INPUTS:
+%   - mask: (struct) spatial mask data structure
+%   - ops: (struct) options and parameters including:
+%       .Nt: total number of time points
+%       .experiment_type: should be 'evoked' for this function
+%       .evoked.peakWidth: peak width threshold
+%       .evoked.findpeak_window: window for peak finding
+%       .evoked.dfof_MinPeakHeight: minimum peak height in units of STD
+%       .evoked.MinPeakWidth: minimum peak width
+%       .evoked.maxISI: maximum interspike interval
+%
+% OUTPUTS:
+%   - mask: (struct) updated mask with properties:
+%       .slope_pk: peak slope magnitudes
+%       .slope_t: times of peak slopes
+%       .STD: signal noise level
+%       .dff_t: times of detected events
+%       .df: delta F amplitudes
+%       .dff: delta F/F amplitudes
+%
+% Last updated: 2026-02-03 15:30
+
 function mask = mask_properties_evoked_overall(mask, ops)
     [pks,locs] = findpeaks(mask.signal_edge);
     % skip the first and last 5 frames

@@ -1,43 +1,38 @@
+%% plotSpikeRaster
+% Creates raster plots from binary spike data or spike times
+%
+% DESCRIPTION:
+%   Efficiently generates raster plots showing spike events across multiple trials/neurons.
+%   Supports multiple visualization modes including horizontal lines, vertical lines,
+%   scatter plots, and imagesc representations. Faster than common implementations.
+%
+% USAGE:
+%   1) [xPoints, yPoints] = plotSpikeRaster(spikes)
+%   2) [xPoints, yPoints] = plotSpikeRaster(spikes, 'PlotType', 'horzline')
+%   3) [xPoints, yPoints] = plotSpikeRaster(spikes, 'FigHandle', figH, 'SpikeDuration', 0.1)
+%
+% INPUTS:
+%   - spikes: (logical array NxM or cell array) spike data:
+%       * Logical array: N=trials, M=time bins (max 1 spike per bin)
+%       * Cell array: N=trials, each cell contains spike times in seconds
+%   - Name-Value Pairs: see below
+%
+% OUTPUTS:
+%   - xPoints: (numeric) x coordinates of spike points
+%   - yPoints: (numeric) y coordinates of spike points
+%
+% PARAMETERS (optional name-value pairs):
+%   - PlotType: 'horzline' (default), 'vertline', 'scatter', 'imagesc', 'horzline2', 'vertline2'
+%   - FigHandle: figure handle (default: gcf)
+%   - SpikeDuration: duration of each spike marker (default: 0.01)
+%   - RelSpikeStartTime: relative start time of spike (default: 0)
+%   - LineWidth: line width for spikes (default: 1)
+%   - MarkerSize: marker size for scatter plots
+%   - And many more - see function documentation
+%
+% Last updated: 2026-02-03 15:30
+
 function [xPoints, yPoints] = plotSpikeRaster(spikes,varargin)
-% PLOTSPIKERASTER Create raster plot from binary spike data or spike times
-%   Efficiently creates raster plots with formatting support. Faster than
-%   common implementations. Multiple plot types and parameters available!
-%   Look at Parameters section below.
-% 
-%   Inputs:
-%       M x N logical array (binary spike data):
-%           where M is the number of trials and N is the number of time
-%           bins with maximum of 1 spike per bin. Assumes time starts at 0.
-%       M x 1 cell of spike times:
-%           M is the number of trials and each cell contains a 1 x N vector
-%           of spike times. Units should be in seconds.
-%
-%   Output:
-%       xPoints - vector of x points used for the plot.
-%       yPoints - vector of y points used for the plot.
-%
-%   Parameters:
-%       PlotType - default 'horzline'. Several types of plots available:
-%           1. 'horzline' -     plots spikes as gray horizontal lines. 
-%           2. 'vertline' -     plots spikes as vertical lines, centered
-%               vertically on the trial number. 
-%           3. 'scatter' -      plots spikes as gray dots.
-%
-%           ONLY FOR BINARY SPIKE DATA:
-%           4. 'imagesc' -      plots using imagesc. Flips colormap so
-%               black indicates a spike. Not affected by SpikeDuration,
-%               RelSpikeStartTime, and similar timing parameters.
-%           5. 'horzline2' -    more efficient plotting than horzline if
-%               you have many timebins, few trials, and high spike density.
-%               Note: SpikeDuration parameter DOES NOT WORK IF LESS THAN 
-%               TIME PER BIN.
-%           6. 'vertline2' -    more efficient plotting than vertline if
-%               you have few timebins, many trials, and high spike density.
-%           Note: Horzline and vertline should be fine for most tasks.
-% 
-%       FigHandle - default gcf (get current figure).
-%           Specify a specific figure or subplot to plot in. If no figure
-%           is specified, plotting will occur on the current figure. If no
 %           figure is available, a new figure will be created.
 % 
 %       LineFormat - default line is gray. Used for 'horzline' and

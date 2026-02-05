@@ -1,11 +1,29 @@
 %% spike_train
-% use spike train analysis for ROI k
+% Performs spike train analysis for individual ROIs using MLspike algorithm
 %
-% USAGE: 
-% 1) spike_train(k)
+% DESCRIPTION:
+%   Extracts and analyzes spike trains from ROI signals using the MLspike
+%   (Markov chain Monte Carlo spike inference) method. Estimates spike times and
+%   amplitudes from the averaged fluorescence signal within an ROI.
+%
+% USAGE:
+%   1) spike_train(k)
+%   2) spike_train([k1, k2, k3])  % multiple ROIs
 %
 % INPUTS:
-%     - k: (int/ int array) index of ROI
+%   - k: (int or int array) index/indices of ROI(s) to analyze
+%
+% OUTPUTS:
+%   Updates base workspace variables:
+%   - event_cluster: updated with spike train analysis results
+%   - ROI: ROI data structure
+%   - px: pixel data structure
+%
+% NOTES:
+%   Accesses base workspace variables: event_cluster, ROI, px, signal_raw, ops
+%   Requires MLspike toolbox and configured spike train parameters
+%
+% Last updated: 2026-02-03 15:30
 
 function spike_train(k)
     % get variables from base workspace

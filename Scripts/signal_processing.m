@@ -1,3 +1,27 @@
+%% signal_processing
+% Performs comprehensive signal processing for fluorescence microscopy data
+%
+% DESCRIPTION:
+%   Applies baseline subtraction, normalization, and filtering to raw fluorescence
+%   signals. Supports spontaneous and evoked activity analysis modes.
+%
+% USAGE:
+%   1) [signal_baseline, signal_df, signal_dfof, signal_dfof_movemean, signal_edge] = signal_processing(signal_raw, ops, option)
+%
+% INPUTS:
+%   - signal_raw: (numeric) raw fluorescence signal matrix (time x pixels)
+%   - ops: (struct) options and parameters
+%   - option: (string) 'spontaneous', 'evoked', or 'evoked_mask'
+%
+% OUTPUTS:
+%   - signal_baseline: (numeric) baseline fluorescence
+%   - signal_df: (numeric) delta F (raw - baseline)
+%   - signal_dfof: (numeric) delta F/F (normalized)
+%   - signal_dfof_movemean: (numeric) moving average of deltaF/F
+%   - signal_edge: (numeric) Gaussian derivative filter output
+%
+% Last updated: 2026-02-03 15:30
+
 function [signal_baseline, signal_df, signal_dfof, signal_dfof_movemean, signal_edge] = signal_processing(signal_raw, ops, option)
     switch option
         case "spontaneous"

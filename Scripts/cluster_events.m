@@ -1,19 +1,27 @@
 %% cluster_events
-% cluster events in ROI
+% Clusters co-active pixels within an ROI into individual synaptic events
 %
-% Last updated: 2026-02-03 15:29
-%               (added ops.plot_pxMap to toggle visualization of pixel map for each ROI)
+% DESCRIPTION:
+%   Groups spatially adjacent active pixels that respond at similar times into
+%   distinct synaptic clusters. Uses hierarchical clustering with a distance threshold
+%   to merge nearby pixels into single events. Can optionally visualize pixel maps.
 %
 % USAGE:
-% 1) event_cluster = cluster_events(ROI,event_cluster,n)
+%   1) event_cluster = cluster_events(ROI, event_cluster, n)
 %
 % INPUTS:
-%     - ROI: (struct) ROI data as structure array
-%     - event_cluster: (struct) synapse data as structure array
-%     - n: (int) index of ROI
+%   - ROI: (struct) ROI data as structure array
+%   - event_cluster: (struct) synapse data as structure array
+%   - n: (int) index of ROI to process
 %
 % OUTPUTS:
-%     - event_cluster: (struct) synapse data as structure array
+%   - event_cluster: (struct) updated synapse data with clustered events for ROI n
+%
+% NOTES:
+%   Accesses base workspace variables: ops, ind, signal_raw, signal_df, signal_dfof
+%
+% Last updated: 2026-02-03 15:29
+%   Added ops.plot_pxMap to toggle visualization of pixel map for each ROI
 
 
 function event_cluster = cluster_events(ROI,event_cluster,n)

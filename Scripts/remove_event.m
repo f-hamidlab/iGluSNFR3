@@ -1,16 +1,29 @@
 %% remove_event
-% remove event for ROI n at time t
+% Removes manually-specified event(s) from an ROI
 %
-% Last updated: 2024-02-20 15:28
-%               (evalin)
+% DESCRIPTION:
+%   Deletes event time point(s) from an ROI's event list and re-clusters the
+%   remaining events. Useful for removing detected false positives.
 %
 % USAGE:
-% 1) remove_event(n, t)
+%   1) remove_event(n, t)
+%   2) remove_event(n, [t1, t2, t3])  % multiple times
 %
 % INPUTS:
 %   - n: (int) index of ROI
-%   - t: (double) timepoint of event to be removed, single number or
-%     array, unit: [s]
+%   - t: (numeric) time point(s) of event(s) to remove, unit: [s]
+%
+% OUTPUTS:
+%   Updates base workspace variables:
+%   - event_cluster: updated with re-clustered events for ROI n
+%   - ROI: updated ROI structure with event times removed
+%
+% NOTES:
+%   Accesses base workspace variables: event_cluster, ROI, ops, ind, signal_df, signal_dfof
+%   Automatically re-clusters remaining events after removal
+%
+% Last updated: 2024-02-20 15:28
+%   Modified to use evalin for base workspace access
 
 function remove_event(n, t)
     

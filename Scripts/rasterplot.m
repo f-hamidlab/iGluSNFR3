@@ -1,3 +1,33 @@
+%% rasterplot
+% Generates spike raster plot for all detected events and optimizes epsilon parameter
+%
+% DESCRIPTION:
+%   Creates a raster plot visualization of spike times across all detected events/ROIs.
+%   Uses DBSCAN clustering on spike data to find the optimal epsilon parameter that
+%   minimizes background noise while preserving spike clusters.
+%
+% USAGE:
+%   1) rasterplot(ops, event_cluster)
+%
+% INPUTS:
+%   - ops: (struct) options and parameters including:
+%       .fs: sampling frequency
+%       .Nt: total number of time points
+%       .spontaneous.peakWidth: width of spike peak
+%       .savedir: directory for saving figures
+%       .fig_format: figure file format
+%       .close_fig: whether to close figures after saving
+%   - event_cluster: (struct) synaptic event data
+%
+% OUTPUTS:
+%   - Figure showing noise fraction vs epsilon parameter
+%   - Figures saved to ops.savedir
+%
+% NOTES:
+%   Tests epsilon values from 1 to 10 with 0.5 increments using DBSCAN clustering
+%
+% Last updated: 2026-02-03 15:30
+
 function rasterplot(ops,event_cluster)
     % getting data
     spikeTimes_fields = fieldnames(event_cluster);

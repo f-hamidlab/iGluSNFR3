@@ -1,53 +1,34 @@
+%% knee_pt
+% Returns the x-location of a knee/elbow point of a curve
+%
+% DESCRIPTION:
+%   Finds the knee point of a curve y=f(x) by fitting two lines (one to the left
+%   and one to the right of each bisection point) and finding the point that
+%   minimizes the sum of fitting errors. Useful for determining cutoff values
+%   like eigenvalue decay or elbow method in clustering.
+%
+% USAGE:
+%   1) [res_x, idx_of_result] = knee_pt(y)
+%   2) [res_x, idx_of_result] = knee_pt(y, x)
+%   3) [res_x, idx_of_result] = knee_pt(y, x, just_return)
+%
+% INPUTS:
+%   - y: (numeric) vector of data values, length >= 3 elements (required)
+%   - x: (numeric) x-coordinates corresponding to y. If not provided, defaults to 1:length(y)
+%   - just_return: (logical) if true, returns NaN on error instead of erroring out
+%
+% OUTPUTS:
+%   - res_x: (numeric) x-coordinate at the knee point
+%   - idx_of_result: (numeric) index of the knee point in the x vector
+%
+% NOTES:
+%   - Function will never return the first or last point as the knee
+%   - x and y do not need to be sorted, but must correspond
+%   - Errors are calculated as sum(abs(residuals)) by default
+%
+% Last updated: 2026-02-03 15:30
+
 function [res_x, idx_of_result] = knee_pt(y,x,just_return)
-%function [res_x, idx_of_result] = knee_pt(y,x,just_return)
-%Returns the x-location of a (single) knee of curve y=f(x)
-%  (this is useful for e.g. figuring out where the eigenvalues peter out)
-%
-%Also returns the index of the x-coordinate at the knee
-%
-%Parameters:
-% y (required) vector (>=3 elements)
-% x (optional) vector of the same size as y
-% just_return (optional) boolean
-%
-%If just_return is True, the function will not error out and simply return a Nan on
-%detected error conditions
-%
-%Important:  The x and y  don't need to be sorted, they just have to
-%correspond: knee_pt([1,2,3],[3,4,5]) = knee_pt([3,1,2],[5,3,4])
-%
-%Important: Because of the way the function operates y must be at least 3
-%elements long and the function will never return either the first or the
-%last point as the answer.
-%
-%Defaults:
-%If x is not specified or is empty, it's assumed to be 1:length(y) -- in
-%this case both returned values are the same.
-%If just_return is not specified or is empty, it's assumed to be false (ie the
-%function will error out)
-%
-%
-%The function operates by walking along the curve one bisection point at a time and
-%fitting two lines, one to all the points to left of the bisection point and one
-%to all the points to the right of of the bisection point.
-%The knee is judged to be at a bisection point which minimizes the
-%sum of errors for the two fits.
-%
-%the errors being used are sum(abs(del_y)) or RMS depending on the
-%(very obvious) internal switch.  Experiment with it if the point returned
-%is not to your liking -- it gets pretty subjective...
-%
-%
-%Example: drawing the curve for the submission
-% x=.1:.1:3; y = exp(-x)./sqrt(x); [i,ix]=knee_pt(y,x); 
-% figure;plot(x,y);
-% rectangle('curvature',[1,1],'position',[x(ix)-.1,y(ix)-.1,.2,.2])
-% axis('square');
-%
-%Food for thought: In the best of possible worlds, per-point errors should
-%be corrected with the confidence interval (i.e. a best-line fit to 2
-%points has a zero per-point fit error which is kind-a wrong).
-%Practially, I found that it doesn't make much difference.
 % 
 %dk /2012
 %{

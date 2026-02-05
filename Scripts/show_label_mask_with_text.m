@@ -1,13 +1,27 @@
-%% show_label_mask
-% show label mask including only ROIs present in event_cluster
+%% show_label_mask_with_text
+% Visualizes ROI label mask with ROI numbers labeled on centroids
+%
+% DESCRIPTION:
+%   Creates and displays a labeled image showing all ROIs with their centroid
+%   positions. ROI numbers are overlaid on the image at each centroid location.
+%   Each unique ROI is assigned a distinct color.
 %
 % USAGE:
-% 1) show_label_mask(event_cluster, ROI, ops)
+%   1) show_label_mask_with_text(event_cluster, ROI, ops)
 %
 % INPUTS:
-%     - event_cluster: (struct) synapse data as structure array
-%     - ROI: (struct) ROI data as structure array
-%     - ops: (struct) options and parameters
+%   - event_cluster: (struct) synapse data as structure array
+%   - ROI: (struct) ROI data as structure array
+%   - ops: (struct) options and parameters including:
+%       .Ny, .Nx: image dimensions
+%       .savedir: directory for saving figures
+%       .fig_format: figure file format
+%
+% OUTPUTS:
+%   - Figures saved: Fig_LabelMask_Text.fig and Fig_LabelMask_Text.[format]
+%   - No variables returned
+%
+% Last updated: 2026-02-03 15:30
 
 function show_label_mask_with_text(event_cluster, ROI, ops)
 
