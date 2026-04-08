@@ -57,9 +57,14 @@ function [im_data, ops] = loadBioFormats(ops, varargin)
     ops.dimOrder = char(omeMeta.getPixelsDimensionOrder(ops.imageIndex).getValue());
     
     % size of pixels (voxels)
-    ops.sizeX = double(omeMeta.getPixelsPhysicalSizeX(ops.imageIndex).value(ome.units.UNITS.MICROMETER)); % [microns]
-    ops.sizeY = double(omeMeta.getPixelsPhysicalSizeY(ops.imageIndex).value(ome.units.UNITS.MICROMETER)); % [microns]
-    
+    try 
+        ops.sizeX = double(omeMeta.getPixelsPhysicalSizeX(ops.imageIndex).value(ome.units.UNITS.MICROMETER)); % [microns]
+        ops.sizeY = double(omeMeta.getPixelsPhysicalSizeY(ops.imageIndex).value(ome.units.UNITS.MICROMETER)); % [microns]
+    catch
+        disp("Pixel size not found in metadata.")
+        ops.sizeX = 1;
+        ops.sizeY = 1;
+    end
     % axes
     ops.x = (0:ops.Nx-1)*ops.sizeX;
     ops.y = (0:ops.Ny-1)*ops.sizeY;

@@ -1,4 +1,4 @@
-%% SPONTANEOUS ACTIVITY DETECTION PIPELINE
+1%% SPONTANEOUS ACTIVITY DETECTION PIPELINE
 % Comprehensive pipeline for detecting synaptic events in single-plane widefield fluorescence imaging
 % 
 % DESCRIPTION:
@@ -47,7 +47,7 @@
 %   3. Run script: it will recursively process all files in filedir
 %   4. Set ops.visualize = false to disable figure generation (faster)
 %
-% Last modified: 2026-02-03 12:31 am
+% Last modified: 2026-02-09 16:25
 % Current branch: main | Status: Production-ready with optimizations
 
 close all
@@ -64,11 +64,16 @@ end
 
 % ========== FILE I/O PATHS ==========
 % path to data ; The script will loop through all subfolders.
-ops.filedir = '../../originals/test_data/'; % Input folder containing raw microscopy files
-ops.fileformat = '.cxd'; % File format to process (.cxd, .tif, .nd2, etc.)
+% ops.filedir = '../../originals/test_data/'; % Input folder containing raw microscopy files
+% ops.filedir = '../../originals/iGluSNFR3 evoked 250312 Halo C/'; % Input folder containing raw microscopy files
+% ops.fileformat = '.cxd'; % File format to process (.cxd, .tif, .nd2, etc.)
+ops.filedir = '../../originals/iGluSNFR3 evoked 250312 Halo C/Image1_test_data/'; % Input folder containing raw microscopy files
+ops.fileformat = '.tif'; % File format to process (.cxd, .tif, .nd2, etc.)
+ops.filename_regex = ['^Cell\d+_(\d+)', ops.fileformat,'$']; % Regular expression for filename matching (e.g., "Cell1_1.tif") - ^ and $ ensure exact match
 
 % path to saving directory
-ops.savedir = '../../outputs/test_data/'; % Output folder for results and figures
+% ops.savedir = '../../outputs/iGluSNFR3 evoked 250312 Halo C/'; % Output folder for results and figures
+ops.savedir = '../../outputs/iGluSNFR3 evoked 250312 Halo C/Image1_test_data/'; % Output folder for results and figures
 
 % ========== ADD DEPENDENCIES TO PATH ==========
 addpath('./Scripts/')                       % Core analysis scripts
@@ -77,55 +82,22 @@ addpath('./Scripts/MLspike/brick/')         % MLspike utilities
 addpath('./Scripts/MLspike/spikes/')        % Spike detection functions
 addpath('./Config/')                        % Configuration files  
 
-ops = config_spontaneous(ops);              % Load default spontaneous configuration
-% ops = config_evoked(ops);                   % Load default evoked configuration
+% Load default evoked configuration
+ops_multi = config_evoked_multi_spec_test_data(ops);  % Load evoked configuration
+ops = ops_multi{1};                         % Use first config as base, will customize per dataset
 
 %%
 if ~exist(ops.savedir, 'dir')
     mkdir(ops.savedir)
 end
 
-%% Unit conversion: Convert time-based parameters from seconds to frames
-% This allows all operations to work with frame indices instead of time values
-ops.sl_window          = round(ops.sl_window * ops.fs);              % Baseline window [frames]
-ops.sl_window_ST       = round(ops.sl_window_ST * ops.fs);           % Spike train window [frames]
-
-% Convert spontaneous event detection thresholds to frames
-ops.spontaneous.rising_time_thres  = round(ops.spontaneous.rising_time_thres * ops.fs);
-ops.spontaneous.maxISI             = round(ops.spontaneous.maxISI * ops.fs);
-ops.spontaneous.findpeak_window    = round(ops.spontaneous.findpeak_window * ops.fs);
-ops.spontaneous.peakWidth          = round(ops.spontaneous.peakWidth * ops.fs);
-ops.spontaneous.MinPeakWidth       = round(ops.spontaneous.MinPeakWidth * ops.fs);
-
-% Convert evoked parameters if running evoked experiment
-if ops.experiment_type == "evoked"
-    ops.(ops.experiment_type).rising_time_thres  = round(ops.(ops.experiment_type).rising_time_thres * ops.fs);
-    ops.(ops.experiment_type).maxISI             = round(ops.(ops.experiment_type).maxISI * ops.fs);
-    ops.(ops.experiment_type).findpeak_window    = round(ops.(ops.experiment_type).findpeak_window * ops.fs);
-    ops.(ops.experiment_type).peakWidth          = round(ops.(ops.experiment_type).peakWidth * ops.fs);
-    ops.(ops.experiment_type).MinPeakWidth       = round(ops.(ops.experiment_type).MinPeakWidth * ops.fs);
-
-    % Calculate stimulus timing in frames
-    ops.stim_time = (0:ops.n_stim-1)/ops.stim_freq + ops.first_stim;
-    ops.stim_frames = ops.stim_time * ops.fs;
-    ops.stim_pk_search_range = arrayfun(@(x) x:x+ops.(ops.experiment_type).findpeak_window, ops.stim_frames, 'UniformOutput', false);
-    ops.stim_pk_search_range = reshape(ops.stim_pk_search_range,[],1);
-    ops.stim_pk_search_range = cell2mat(ops.stim_pk_search_range);
-    ops.len_spike = ops.len_spike * ops.fs;
-end
-
-% Convert spike train parameters to frames
-ops.ST.sumOfPeak_window = round(ops.ST.sumOfPeak_window * ops.fs);
-ops.ST.gaussian_window  = round(ops.ST.gaussian_window * ops.fs);
-ops.ST.gap_thres        = round(ops.ST.gap_thres * ops.fs);
-
 %% Loop through all files in the input directory and process
-loop_through_folder(ops.filedir, ops);
+loop_through_folder(ops.filedir, ops, ops_multi);
 
 disp('Done:)')
 
 %%
-function loop_through_folder(foldername, ops)
+function loop_through_folder(foldername, ops, ops_multi)
     %% loops through folder and subfolders
     filelist = dir(foldername);
     ops.savepath = ops.savedir;
@@ -148,9 +120,10 @@ function loop_through_folder(foldername, ops)
                 mkdir(ops.savedir)  
             end
             
-            loop_through_folder(fullfile(filelist(i).folder,filelist(i).name), ops);
+            loop_through_folder(fullfile(filelist(i).folder,filelist(i).name), ops, ops_multi);
 
-        elseif contains(filelist(i).name, ops.fileformat) % change file format
+        elseif contains(filelist(i).name, ops.fileformat) && ~isempty(regexp(filelist(i).name, ops.filename_regex, 'once'))
+            % Process file if it matches the format AND the filename pattern
             ops.filename = fullfile(filelist(i).folder, filelist(i).name);
             
             % create new folder for saving data for each image file
@@ -159,10 +132,32 @@ function loop_through_folder(foldername, ops)
             if ~exist(ops.savedir, 'dir')
                 mkdir(ops.savedir)  
             end
+            % extract image number from filename using ops.filename_regex pattern
+            % Split regex by "." delimiter and take the first part (without file extension)
+            regex_pattern = split(ops.filename_regex, ".");
+            regex_pattern = regex_pattern{1};
+            
+            img_num = regexp(filename, regex_pattern, 'tokens');
+            if ~isempty(img_num)
+                img_num = str2double(img_num{1}{1});
+                if img_num <= length(ops_multi)
+                    ops_customized = ops_multi{img_num}; % Use specific config for this image
+                else
+                    warning('Image number exceeds config length. Using default config.')
+                    ops_customized = ops; % Use default config if no specific one
+                end
+            else
+                warning('Could not extract image number from filename. Using default config.')
+                ops_customized = ops; % Use default config if no image number found
+            end
+
+            % Copy necessary fields from ops to ops_customized
+            ops_customized.filename = ops.filename;
+            ops_customized.savedir = ops.savedir;
 
             % try
                 tStart = tic;
-                multi_cell_activity_detection(ops);
+                multi_cell_activity_detection(ops_customized);
                 tEnd = toc(tStart);
                 fprintf('Pipeline completed for %s in %.2f seconds (%.2f minutes)\n', filename, tEnd, tEnd/60);
             % catch
@@ -682,7 +677,15 @@ toc
 
 %% Clustering
 tic;
+if isempty(ROI)
+    fprintf("No ROI found for %s.", ops.filename);
+    event_cluster = struct([]);
+    save_data();
+    return
+end
+
 disp('Clustering events...')
+
 event_cluster = struct([]);
 n_cluster = 0;
 if ops.plot_pxMap
