@@ -80,4 +80,8 @@ function width = getNoiseLevel(noise_signal, t, ST) % Determine width of spike t
     s = f(1:2:end-1);  
     y = f(2:2:end)-s; 
     width = max(y); % Establishing widest spike train 
+
+    if isempty(width)
+        width = 0; % If no peaks, set width to 0
+    end
 end
