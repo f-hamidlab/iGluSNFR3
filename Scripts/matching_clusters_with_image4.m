@@ -34,8 +34,13 @@ function matching_clusters_with_image4(foldername)
     for t = 1:N_trial % ignore the last dataset which was a different experiment setting
         filename = fullfile(filelist(t).folder, filelist(t).name);
         load(filename,"event_cluster", "ops")
+        if size(event_cluster) == 0
+            disp(['No event_cluster variable found in ' filename ' - skipping'])
+            continue
+        end
+
         [event_cluster.trial] = deal(t);
-        if t == 1
+        if ~exist("event_cluster_tmp", "var")
             event_cluster_tmp = event_cluster;
         else
             event_cluster_tmp = [event_cluster_tmp; event_cluster];

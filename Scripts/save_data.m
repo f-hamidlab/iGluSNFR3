@@ -34,8 +34,38 @@ function save_data()
 % save data
 tic;
 disp('Saving data...')
-evalin("caller","filename = strcat(ops.savedir, filesep, 'processed_data.mat');")
-evalin("caller","save(filename,""px"",""mask"",""ind"",""ops"",""signal_raw"",""signal_df"",""signal_dfof"",""signal_dfof_movemean"",""signal_baseline"",""signal_edge"",""event_cluster"", ""ROI"",""stats"")")
+
+% List of variables to potentially save
+vars_to_save = {"px", "mask", "ind", "ops", "signal_raw", "signal_df", "signal_dfof", ...
+                "signal_dfof_movemean", "signal_baseline", "signal_edge", "event_cluster", "ROI", "stats"};
+
+% Check which variables exist in caller workspace
+existing_vars = {};
+for i = 1:length(vars_to_save)
+    var_name = vars_to_save{i};
+    if evalin("caller", sprintf("exist('%s', 'var')", var_name))
+        existing_vars{end+1} = var_name;
+    else
+        evalin("caller", sprintf("disp('  Variable ''%s'' not found - will not be saved')", var_name));
+    end
+end
+
+% Build and execute save command with existing variables only
+if ~isempty(existing_vars)
+    % Create comma-separated list of variable names as strings
+    var_strings = cellfun(@(x) sprintf('"%s"', x), existing_vars, 'UniformOutput', false);
+    var_list = strjoin(var_strings, ',');
+    
+    % Execute save command
+    disp(['Saving ' num2str(length(existing_vars)) ' variables...'])
+    save_cmd = sprintf('filename = strcat(ops.savedir, filesep, ''processed_data.mat''); save(filename,%s)', var_list);
+    evalin("caller", save_cmd);
+    disp(['Successfully saved ' num2str(length(existing_vars)) ' variables.'])
+else
+    warning('No variables found to save. Creating empty processed_data.mat.')
+    evalin("caller", "filename = strcat(ops.savedir, filesep, 'processed_data.mat'); save(filename, 'ops');")
+end
+
 toc
 
 end
