@@ -1,6 +1,6 @@
 # iGluSNFR3
 
-Detection of synaptic activity in widefield single-plane fluorescence imaging (iGluSNFR3).
+Detection of synaptic activity in widefield single-plane fluorescence imaging [iGluSNFR3](https://www.nature.com/articles/s41592-023-01863-6).
 
 This repository currently provides two maintained MATLAB entry pipelines:
 
@@ -221,9 +221,9 @@ For each processed recording, output folders typically contain:
 
 ## Citation
 
-If you use iGluSNFR3, please cite the probe paper:
+If you use this analysis pipeline, please cite:
 
-- iGluSNFR3 probe: https://www.nature.com/articles/s41592-023-01863-6
+- 
 
 ## Additional Documentation
 
