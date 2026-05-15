@@ -1,57 +1,231 @@
 # iGluSNFR3
-Detection of Synaptic Activities in Widefield Microscopy
 
-For installation and details of the toolbox, please refer to the [wiki page](https://github.com/f-hamidlab/iGluSNFR3/wiki/02-Using-the-Scripts).
+Detection of synaptic activity in widefield single-plane fluorescence imaging (iGluSNFR3).
 
-## Designed for:
-- single plane image 
-- [iGluSNFR3 probe] (https://www.nature.com/articles/s41592-023-01863-6)
-- multi-cellular
-- spontaneous synaptic activities
+This repository currently provides two maintained MATLAB entry pipelines:
 
-## Dependencies:
-1) MLspike toolbox (https://github.com/MLspike)
-2) Bio-Format Toolbox (https://bio-formats.readthedocs.io/en/v7.0.0/users/matlab/index.html, https://bio-formats.readthedocs.io/en/v7.0.0/developers/matlab-dev.html)
+- `multi_cell_activity_detection_pipeline.m`: single-condition pipeline (supports spontaneous and evoked datasets via config selection)
+- `multi_cell_activity_detection_pipeline_matching.m`: evoked multi-condition pipeline with post hoc cluster matching
 
-## Main Pipeline Scripts:
-- multi_cell_activity_detection_pipeline.m - Main pipeline for synaptic activity detection
-- multi_cell_activity_detection_pipeline_spontaneous.m - Spontaneous activity detection
-- multi_cell_activity_detection_pipeline_evoked.m - Evoked activity detection
-- multi_cell_activity_detection_pipeline_evoked_matching.m - Evoked activity detection with cluster matching
+The code processes Bio-Formats-compatible microscopy files, detects events at pixel/ROI level, clusters synchronous activity, and exports figures and `processed_data.mat` outputs.
 
-## Signal Processing & Analysis Scripts:
-- signal_processing.m - Core signal processing routines
-- findpeaks_2d.m - 2D peak detection
-- sliding_window_filter.m - Sliding window filtering
-- cluster_events.m - Event clustering
-- knee_pt.m - Knee point detection
-- px_properties.m - Pixel properties analysis
-- mask_properties_evoked_overall.m - Mask properties for evoked responses
+## Scope and Supported Data
 
-## ROI & Spatial Analysis:
-- ROI_pxMap_allTime.m - ROI pixel mapping across time
-- Area3_1.m - Area analysis
-- matching_clusters.m - Cluster matching across conditions
-- matching_clusters_with_image4.m - Cluster matching with image registration
+- Single-plane, single-channel fluorescence recordings
+- iGluSNFR3 probe datasets
+- File formats readable by Bio-Formats (for example `.cxd`, `.tif`, `.nd2`)
+- Typical acquisition rates around 100 Hz (set in config)
 
-## Spike Train & Event Analysis:
-- spike_train.m - Spike train generation and analysis
-- spike_train_par.m - Parallel spike train analysis
-- ST_function.m - Spike train functions
-- event_stats.m - Event statistics calculation
-- plotSpikeRaster.m - Spike raster plotting
-- rasterplot.m - Raster plot visualization
+## Requirements
 
-## Data I/O & Visualization:
-- save_data.m - Data saving utilities
-- saveastiff.m - TIFF file saving
-- show_label_mask.m - Labeled mask visualization
-- show_label_mask_with_text.m - Labeled mask with text labels
-- plot_signal_pixel.m - Pixel signal plotting
-- loadBioFormats.m - Bio-Formats image loading
+### 1) MATLAB
 
-## Data Curation & Editing:
-- add_event.m - Add events manually
-- remove_event.m - Remove events
-- remove_ROI.m - Remove ROI regions
+Use a recent MATLAB release with these toolboxes available:
+
+- Image Processing Toolbox
+- Signal Processing Toolbox
+
+### 2) Included third-party code (already in this repository)
+
+- Bio-Formats MATLAB utilities in `Scripts/bfmatlab/` (including `bioformats_package.jar`)
+- MLspike helper code in `Scripts/MLspike/`
+
+No separate clone is required if you use this repository as-is.
+
+## Installation
+
+1. Clone or download this repository.
+2. Open MATLAB.
+3. Set your MATLAB current folder to the repository root (the folder containing `multi_cell_activity_detection_pipeline.m`).
+4. Open one of the pipeline entry scripts and edit paths/configuration before running (details below).
+
+## Quick Start
+
+### A) Single-condition pipeline (spontaneous or evoked)
+
+Use `multi_cell_activity_detection_pipeline.m`.
+
+1. In the script, set:
+	 - `ops.filedir` to your raw data root
+	 - `ops.fileformat` to your extension (for example `.cxd` or `.tif`)
+	 - `ops.savedir` to your output root
+2. Choose the config based on dataset type:
+	 - `ops = config_spontaneous(ops);` for spontaneous activity datasets
+	 - `ops = config_evoked(ops);` for single-condition evoked datasets
+3. Confirm acquisition frame rate (`ops.fs`) in the config file you selected.
+4. Run the script in MATLAB.
+
+Behavior:
+
+- Recursively scans subfolders under `ops.filedir`
+- Creates per-file output folders under `ops.savedir`
+- Writes `processed_data.mat`, figure files, and optional masks/maps
+
+### B) Evoked multi-condition pipeline with matching
+
+Use `multi_cell_activity_detection_pipeline_matching.m`.
+
+1. In the script, set:
+	 - `ops.filedir`
+	 - `ops.fileformat` (default currently `.tif`)
+	 - `ops.savedir`
+	 - `ops.filename_regex` to match your naming scheme (default expects names like `Cell1_1.tif`)
+2. Choose/configure one multi-spec config file:
+	 - `Config/config_evoked_multi_spec.m` for real experiments
+	 - `Config/config_evoked_multi_spec_test_data.m` for bundled test examples
+3. In the chosen config file:
+	 - set `N` to the number of images/conditions
+	 - customize per-image stimulus parameters (`first_stim`, `n_stim`, `stim_freq`, `len_spike`) as needed
+	 - verify `ops.fs`
+4. Run `multi_cell_activity_detection_pipeline_matching.m`.
+
+Behavior:
+
+- Applies condition-specific parameters based on image number parsed from filename
+- Runs event detection for each file
+- Runs cluster matching at the end of each leaf folder (currently via `matching_clusters_with_image4`)
+
+## Minimal Example Run
+
+The example below runs the spontaneous pipeline on one TIFF recording.
+
+Example folder layout:
+
+```text
+iGluSNFR3/
+├── multi_cell_activity_detection_pipeline.m
+├── Config/
+├── Scripts/
+├── originals/
+│   └── demo_spont/
+│       └── Cell1_1.tif
+└── outputs/
+```
+
+Edit `multi_cell_activity_detection_pipeline.m`:
+
+```matlab
+ops.filedir = './originals/demo_spont/';
+ops.fileformat = '.tif';
+ops.savedir = './outputs/demo_spont/';
+ops = config_spontaneous(ops);
+```
+
+Run in MATLAB:
+
+```matlab
+run('multi_cell_activity_detection_pipeline.m')
+```
+
+Expected output after a successful run:
+
+```text
+outputs/
+└── demo_spont/
+	└── Cell1_1/
+		├── processed_data.mat
+		├── ROI_pxMap/                  (created; may be empty if plotting is off)
+		└── Fig*.png                    (if visualization is enabled)
+```
+
+Notes:
+
+- If no figures are created, check whether `ops.visualize` is set to `false` in your config.
+- If your file is not detected, verify that `ops.fileformat` matches the extension exactly.
+
+## Key Configuration Files
+
+- `Config/config_spontaneous.m`: defaults for spontaneous analysis
+- `Config/config_evoked.m`: defaults for single-condition evoked analysis
+- `Config/config_evoked_multi_spec.m`: per-condition evoked settings for multi-spec experiments
+- `Config/config_evoked_multi_spec_test_data.m`: test-data variant of multi-spec settings
+
+Important: these configs convert many time-based parameters into frames internally. Always verify `ops.fs` matches your acquisition settings before running.
+
+## Advanced Option: Create Your Own Config File
+
+You can create a custom config file for your lab or experiment instead of editing the default configs.
+
+### 1) Create a new config in `Config/`
+
+1. Copy a starting template:
+   - `Config/config_spontaneous.m` for spontaneous-like data
+   - `Config/config_evoked.m` for single-condition evoked data
+2. Save as a new file, for example `Config/config_my_experiment.m`.
+3. Rename the function inside the file so it matches the filename:
+
+```matlab
+function ops = config_my_experiment(ops)
+```
+
+### 2) Use your custom config in the single-condition pipeline
+
+In `multi_cell_activity_detection_pipeline.m`, replace the config call with your custom function:
+
+```matlab
+ops = config_my_experiment(ops);
+```
+
+### 3) Optional: Use a custom multi-spec config for matching pipeline
+
+For multi-condition evoked workflows, copy and customize:
+
+- `Config/config_evoked_multi_spec.m`
+
+Then call your custom multi-spec config in `multi_cell_activity_detection_pipeline_matching.m`:
+
+```matlab
+ops_multi = config_my_multi_spec(ops);
+ops = ops_multi{1};
+```
+
+### 4) Recommended validation checks
+
+- Confirm `ops.fs` matches acquisition frame rate.
+- Confirm `ops.experiment_type` is set appropriately.
+- Run one short recording first and inspect `processed_data.mat` and figures.
+
+## Input Data Notes
+
+- If `ops.use_binary_mask = true`, provide a binary mask TIFF near each source dataset as expected by the script pattern:
+	- `MAX_Cell*_binary_*.tif`
+- If `ops.use_binary_mask = false`, the pipeline performs automatic threshold-based segmentation.
+
+## Output Structure
+
+For each processed recording, output folders typically contain:
+
+- `processed_data.mat`: detected events, ROI/spike statistics, analysis outputs
+- Figure files (format from `ops.fig_format`)
+- `ROI_pxMap/` (if enabled)
+- Optional ImageJ-compatible TIFF masks (depending on save flags)
+
+## Performance Tips
+
+- Set `ops.visualize = false` to reduce runtime and memory usage.
+- Keep `ops.close_fig = true` for large batch runs.
+- Use `ops.redo_detection = false` to skip files that already have `processed_data.mat`.
+
+## Troubleshooting
+
+- Bio-Formats/Java errors:
+	- ensure the repository root is your MATLAB current folder
+	- ensure `Scripts/bfmatlab/` is added (the pipeline does this automatically)
+- No files processed:
+	- check `ops.fileformat`
+	- check `ops.filename_regex` in the matching pipeline
+	- verify your input folder tree under `ops.filedir`
+- Poor detection quality:
+	- verify frame rate (`ops.fs`)
+	- tune thresholds in the relevant config file (`m_thres`, `SNR_thres`, peak parameters)
+
+## Citation
+
+If you use iGluSNFR3, please cite the probe paper:
+
+- iGluSNFR3 probe: https://www.nature.com/articles/s41592-023-01863-6
+
+## Additional Documentation
+
+Project wiki: https://github.com/f-hamidlab/iGluSNFR3/wiki/
 
