@@ -1,0 +1,8 @@
+napari
+numpy
+scipy
+scikit-image
+tifffile
+imageio
+qtpy
+magicgui

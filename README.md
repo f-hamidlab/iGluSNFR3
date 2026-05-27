@@ -7,6 +7,8 @@ This repository currently provides two maintained MATLAB entry pipelines:
 - `multi_cell_activity_detection_pipeline.m`: single-condition pipeline (supports spontaneous and evoked datasets via config selection)
 - `multi_cell_activity_detection_pipeline_matching.m`: evoked multi-condition pipeline with post hoc cluster matching
 
+Use the first pipeline when you want to analyze one condition at a time. Use the second pipeline when one folder contains multiple evoked conditions that should be matched after detection.
+
 The code processes Bio-Formats-compatible microscopy files, detects events at pixel/ROI level, clusters synchronous activity, and exports figures and `processed_data.mat` outputs.
 
 ## Scope and Supported Data
@@ -146,6 +148,8 @@ Important: these configs convert many time-based parameters into frames internal
 
 You can create a custom config file for your lab or experiment instead of editing the default configs.
 
+This is useful when you want to keep the shipped config files unchanged and put your own experiment settings in a separate file.
+
 ### 1) Create a new config in `Config/`
 
 1. Copy a starting template:
@@ -179,6 +183,8 @@ ops_multi = config_my_multi_spec(ops);
 ops = ops_multi{1};
 ```
 
+In this example, the custom multi-spec config returns one settings set per condition, so `ops_multi{1}` selects the first one.
+
 ### 4) Recommended validation checks
 
 - Confirm `ops.fs` matches acquisition frame rate.
@@ -187,7 +193,8 @@ ops = ops_multi{1};
 
 ## Input Data Notes
 
-- If `ops.use_binary_mask = true`, provide a binary mask TIFF near each source dataset as expected by the script pattern:
+
+- If `ops.use_binary_mask = true`, place a binary mask TIFF next to each source dataset using the filename pattern expected by the script:
 	- `MAX_Cell*_binary_*.tif`
 - If `ops.use_binary_mask = false`, the pipeline performs automatic threshold-based segmentation.
 

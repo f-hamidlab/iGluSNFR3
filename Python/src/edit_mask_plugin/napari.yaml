@@ -1,0 +1,11 @@
+name: edit-mask-plugin
+display_name: Edit Mask Plugin
+schema_version: 0.1.0
+contributions:
+  commands:
+    - id: edit-mask-plugin.make_widget
+      title: Open Edit Mask Panel
+      python_name: edit_mask_plugin._widget:EditMaskWidget
+  widgets:
+    - command: edit-mask-plugin.make_widget
+      display_name: Edit Mask

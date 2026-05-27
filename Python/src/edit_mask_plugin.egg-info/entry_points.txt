@@ -1,0 +1,2 @@
+[napari.manifest]
+edit-mask-plugin = edit_mask_plugin:napari.yaml
