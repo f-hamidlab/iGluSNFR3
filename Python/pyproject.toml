@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "edit-mask-plugin"
+version = "0.1.0"
+description = "Napari plugin for browsing and editing filtered masks"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "Hamid Lab" }
+]
+dependencies = [
+  "napari",
+  "numpy",
+  "scipy",
+  "scikit-image",
+  "tifffile",
+  "imageio",
+  "qtpy",
+  "magicgui"
+]
+
+[project.entry-points."napari.manifest"]
+edit-mask-plugin = "edit_mask_plugin:napari.yaml"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+edit_mask_plugin = ["napari.yaml"]

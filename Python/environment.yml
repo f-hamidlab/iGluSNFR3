@@ -1,0 +1,19 @@
+name: edit_mask
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.11
+  - pip
+  - numpy
+  - scipy
+  - scikit-image
+  - pandas
+  - tifffile
+  - imageio
+  - pyqt
+  - qtpy
+  - napari
+  - magicgui
+  - pip:
+      - npe2
