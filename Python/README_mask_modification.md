@@ -6,24 +6,22 @@ This folder contains a Napari plugin for reviewing and editing filtered masks ge
 
 - Recursively scans a selected root folder for `*_mask_data.mat` files and builds a file list for quick navigation.
 - Loads four aligned layers from each `*_mask_data.mat` file:
-  - Projection of original image
+  - Denoised projection of the original image
   - Filtered image
   - Unfiltered mask
   - Filtered mask (editable)
 - Supports multi-file loading with collision-safe layer names (relative path prefixes).
-- Provides translation tools for dataset-level alignment:
-  - Step translation (`dx`, `dy`) with Apply
-  - Nudge buttons (`Left/Right/Up/Down`)
-  - Keyboard nudge (`Shift+Arrow`)
-  - Reset translation to `(0, 0)`
+- Adds a layer sorting panel with order and criteria controls.
+- Adds a layer visibility panel for quick type-based show/hide across loaded datasets.
+- Adds an active-layer-only bounding box panel with visibility, color, thickness, and opacity controls.
+- Provides translation tools for dataset-level alignment, including keyboard nudge and reset options.
 - Saves translation offsets per file and restores them when that file is loaded again.
 - Provides editing tools for filtered mask:
-  - Pencil
-  - Eraser
-  - Add region from unfiltered mask
-  - Delete region from unfiltered mask
+  - Navigate (safe) mode (default) mapped to camera pan/zoom to prevent accidental edits
+  - Pencil / Eraser
+  - Add region / Delete region from unfiltered mask
   - Editable brush size slider + numeric input
-- Tracks unsaved state by actual filtered-mask content comparison (not just UI events).
+- Tracks unsaved state by comparing both filtered-mask content and translation offsets.
 - Saves by overwriting the selected `*_mask_data.mat` file (`filtered_mask` only) and writing `*_binary.tif`.
 
 ## 0) First-time setup (if you are new to command line)
@@ -98,15 +96,20 @@ In Napari:
 5. Load files with:
   - `Add to loaded` (append only new files)
   - `Reset and load` (clear and load selected files)
-6. Use panel `3) Layer visibility` to toggle visibility by layer type across all loaded datasets.
-7. Use panel `4) Translation` to align currently active dataset:
+6. Use panel `3) Layer sorting` to sort loaded layers:
+  - Order: ascending or descending
+  - Criteria: alphabetical, cell number, recording number, or image type
+7. Use panel `4) Layer visibility` to toggle visibility by layer type across all loaded datasets.
+8. Use panel `5) Bounding box (active layer)` to style the bounding box shown for the currently active layer.
+9. Use panel `6) Translation` to align currently active dataset:
   - Set `Step dx/dy` and click `Apply step`
   - Use `Left/Right/Up/Down`
   - Use `Shift+Arrow` for keyboard nudge
-  - Use `Reset translation` to return dataset to original coordinates
-8. Use panel `5) Edit filtered mask` for mask editing.
-9. Use panel `6) Save`:
-  - `Save active` saves current active filtered-mask dataset
+  - Use `Reset to zero` or `Reset to saved` (`Reset to saved` restores the last saved translation offset)
+10. Use panel `7) Edit filtered mask` for mask editing.
+  - Default mode is `Navigate (safe)`; switch to edit tools when needed
+11. Use panel `8) Save`:
+  - `Save active` saves the dataset only when the active layer is that dataset's `Filtered mask` layer
   - `Save all modified` saves all unsaved datasets
   - Unsaved indicator shows `Modified but not saved: ...`
 
@@ -114,23 +117,25 @@ The panel remembers the last successful root folder you used. If that folder no 
 
 ## Multi-file workflow
 
-- **Unsaved changes indicator**: Shows `Modified but not saved: ...` using root-relative paths.
+- **Unsaved changes**: `Modified but not saved: ...` is shown when mask data changed and/or translation changed from saved baseline.
 - **Append vs. Reset**: Load multiple files side-by-side without losing edits, or start fresh by resetting.
 - **Warnings on reset/close**: If you have unsaved changes and attempt a reset or close Napari, you will be asked to confirm.
 - **Layer naming**: Each file's layers are prefixed with its relative path under the scanned root, so duplicate filenames in different folders stay separate (e.g., `Image1/Cell1_1/Cell1_1 | Projection` and `Image2/Cell1_1/Cell1_1 | Projection`).
+- **Display naming modes**: File-list labels and layer labels can each be shown as either relative path or filename only.
 - **Active layer behavior**:
-  - Translation applies to the dataset of whichever layer is currently active.
-  - Save active uses the active filtered-mask layer.
+  - Translation applies to the dataset of whichever layer in that dataset is currently active.
+  - `Save active` only works when the active layer is the dataset's `Filtered mask` layer.
 
 ## Translation persistence
 
 - Translation offset is stored per MAT file path.
 - When a previously translated file is loaded again, its last translation offset is reapplied automatically.
-- `Reset translation` sets offset back to `(0, 0)` and updates the stored offset.
+- `Reset to zero` sets offset back to `(0, 0)`.
+- `Reset to saved` restores the translation baseline from the last save.
 
 ## Expected variables in each MAT file
 
-- `im_denoised` (projection/original image)
+- `im_denoised` (used for the `Projection` layer; more precisely a denoised projection)
 - `im_filtered` (filtered image)
 - `binary_mask` (unfiltered mask)
 - `filtered_mask` (filtered mask; editable in Napari)
@@ -142,21 +147,15 @@ The panel remembers the last successful root folder you used. If that folder no 
 - It replaces only `filtered_mask` with the edited mask.
 - It also writes `*_binary.tif` in the same folder.
 
-## Input file type
-
-- MATLAB data files: `*_mask_data.mat`
-
 ## Recommended editing workflow
 
-1. Keep `Projection` and `Filtered image` visible while editing.
-2. If needed, align the active dataset first using panel `4) Translation`:
-   - Use `Step dx/dy` + `Apply step` and nudge buttons (`Left/Right/Up/Down`).
-   - Keyboard nudge is also available with `Shift+Arrow`.
-3. Use low opacity for masks to see image context.
-4. Use `Pencil` and `Eraser` for local mask edits.
-5. Use `Add region` or `Delete region` to add/remove full connected components from the unfiltered mask.
-6. When done editing, use `Reset translation` to return layers to original coordinates.
-7. Save with `Save active` (current file) or `Save all modified`.
+The practical editing sequence is already covered in the **In Napari** step-by-step section above.
+
+Quick reminder:
+
+1. Keep `Navigate (safe)` active while inspecting/panning.
+2. Align first (if needed), then edit (`Pencil`/`Eraser` or `Add region`/`Delete region`).
+3. Save with `Save active` or `Save all modified`.
 
 ## Troubleshooting
 

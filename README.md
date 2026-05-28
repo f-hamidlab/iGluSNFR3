@@ -49,13 +49,15 @@ Use `multi_cell_activity_detection_pipeline.m`.
 
 1. In the script, set:
 	 - `ops.filedir` to your raw data root
-	 - `ops.fileformat` to your extension (for example `.cxd` or `.tif`)
 	 - `ops.savedir` to your output root
 2. Choose the config based on dataset type:
 	 - `ops = config_spontaneous(ops);` for spontaneous activity datasets
 	 - `ops = config_evoked(ops);` for single-condition evoked datasets
-3. Confirm acquisition frame rate (`ops.fs`) in the config file you selected.
-4. Run the script in MATLAB.
+3. In the selected config file, set input matching fields as needed:
+	 - `ops.fileformat` (for example `.cxd` or `.tif`)
+	 - `ops.filename_regex` (regex filter for accepted filenames)
+4. Confirm acquisition frame rate (`ops.fs`) in the config file you selected.
+5. Run the script in MATLAB.
 
 Behavior:
 
@@ -69,13 +71,14 @@ Use `multi_cell_activity_detection_pipeline_matching.m`.
 
 1. In the script, set:
 	 - `ops.filedir`
-	 - `ops.fileformat` (default currently `.tif`)
 	 - `ops.savedir`
-	 - `ops.filename_regex` to match your naming scheme (default expects names like `Cell1_1.tif`)
 2. Choose/configure one multi-spec config file:
 	 - `Config/config_evoked_multi_spec.m` for real experiments
 	 - `Config/config_evoked_multi_spec_test_data.m` for bundled test examples
 3. In the chosen config file:
+	 - set input matching fields:
+		 - `ops.fileformat`
+		 - `ops.filename_regex` (default expects names like `Cell1_1.tif`)
 	 - set `N` to the number of images/conditions
 	 - customize per-image stimulus parameters (`first_stim`, `n_stim`, `stim_freq`, `len_spike`) as needed
 	 - verify `ops.fs`
@@ -84,6 +87,7 @@ Use `multi_cell_activity_detection_pipeline_matching.m`.
 Behavior:
 
 - Applies condition-specific parameters based on image number parsed from filename
+- If image index exceeds available condition configs, selection loops cyclically (e.g. 5->1, 6->2 for 4 configs)
 - Runs event detection for each file
 - Runs cluster matching at the end of each leaf folder (currently via `matching_clusters_with_image4`)
 
@@ -108,9 +112,9 @@ Edit `multi_cell_activity_detection_pipeline.m`:
 
 ```matlab
 ops.filedir = './originals/demo_spont/';
-ops.fileformat = '.tif';
 ops.savedir = './outputs/demo_spont/';
 ops = config_spontaneous(ops);
+% Set ops.fileformat and ops.filename_regex in Config/config_spontaneous.m
 ```
 
 Run in MATLAB:
@@ -133,7 +137,7 @@ outputs/
 Notes:
 
 - If no figures are created, check whether `ops.visualize` is set to `false` in your config.
-- If your file is not detected, verify that `ops.fileformat` matches the extension exactly.
+- If your file is not detected, verify `ops.fileformat` and `ops.filename_regex` in your selected config.
 
 ## Key Configuration Files
 
@@ -142,7 +146,7 @@ Notes:
 - `Config/config_evoked_multi_spec.m`: per-condition evoked settings for multi-spec experiments
 - `Config/config_evoked_multi_spec_test_data.m`: test-data variant of multi-spec settings
 
-Important: these configs convert many time-based parameters into frames internally. Always verify `ops.fs` matches your acquisition settings before running.
+Important: these configs define file matching (`ops.fileformat`, `ops.filename_regex`) and convert many time-based parameters into frames internally. Always verify `ops.fs` matches your acquisition settings before running.
 
 ## Advanced Option: Create Your Own Config File
 
@@ -193,10 +197,51 @@ In this example, the custom multi-spec config returns one settings set per condi
 
 ## Input Data Notes
 
-
-- If `ops.use_binary_mask = true`, place a binary mask TIFF next to each source dataset using the filename pattern expected by the script:
-	- `MAX_Cell*_binary_*.tif`
 - If `ops.use_binary_mask = false`, the pipeline performs automatic threshold-based segmentation.
+- If `ops.use_binary_mask = true`, mask lookup is configurable from the selected config file in `Config/`.
+
+### Binary Mask Lookup Configuration
+
+Set these fields in your selected config file (for example `Config/config_evoked.m`, `Config/config_spontaneous.m`, or multi-spec config defaults):
+
+```matlab
+ops.binary_mask_location = "auto";
+ops.binary_mask_pattern_filedir = 'MAX_Cell*_binary_*.tif';
+ops.binary_mask_pattern_savedir = 'Cell*_*_binary.tif';
+ops.binary_mask_pattern_savedir_parent_recursive = 'Cell*_*_binary.tif';
+ops.binary_mask_group_size = 4;
+```
+
+Supported `ops.binary_mask_location` values:
+
+- `"filedir"`: search only in the same folder as the source image (`ops.filename`) using `ops.binary_mask_pattern_filedir`
+- `"savedir"`: search only in the per-file output folder (`ops.savedir`) using `ops.binary_mask_pattern_savedir`
+- `"savedir_parent_recursive"`: search recursively under `parent(ops.savedir)` using `ops.binary_mask_pattern_savedir_parent_recursive`
+- `"auto"`: search all locations above in that priority order
+
+Savedir-specific mask selection rule:
+
+- For masks found via `"savedir"` or `"savedir_parent_recursive"`, the script expects filenames like:
+	- `CellX_num_binary.tif` (for example `Cell1_3_binary.tif`)
+- Let `n` be the recording number from the image filename `CellX_n.tif`.
+- Let `g = ops.binary_mask_group_size`.
+- The target mask number is computed as:
+	- $floor((n-1)/g) * g + 1$
+- Only masks whose `num` matches that target are considered valid candidates.
+
+Note for multi-condition configs:
+
+- In `config_evoked_multi_spec*.m`, `ops.binary_mask_group_size` is synced to top-level `N` by default.
+
+Examples:
+
+- Image `Cell1_1.tif` with `g=4` -> target mask number $floor((1-1)/4)*4+1 = 1$ -> selects `Cell1_1_binary.tif`
+- Image `Cell1_4.tif` with `g=4` -> target mask number $floor((4-1)/4)*4+1 = 1$ -> selects `Cell1_1_binary.tif`
+- Image `Cell1_5.tif` with `g=4` -> target mask number $floor((5-1)/4)*4+1 = 5$ -> selects `Cell1_5_binary.tif`
+
+Behavior when multiple files match after filtering:
+
+- The script keeps the first match found in search order and emits a warning.
 
 ## Output Structure
 
@@ -220,7 +265,7 @@ For each processed recording, output folders typically contain:
 	- ensure `Scripts/bfmatlab/` is added (the pipeline does this automatically)
 - No files processed:
 	- check `ops.fileformat`
-	- check `ops.filename_regex` in the matching pipeline
+	- check `ops.filename_regex`
 	- verify your input folder tree under `ops.filedir`
 - Poor detection quality:
 	- verify frame rate (`ops.fs`)
