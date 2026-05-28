@@ -1,10 +1,20 @@
 function ops = config_evoked(ops)
+    % ========== INPUT FILE MATCHING ==========
+    ops.fileformat = '.cxd';                   % File format to process (.cxd, .tif, .nd2, etc.)
+    ops.filename_regex = ['^.*', regexptranslate('escape', ops.fileformat), '$'];
+
     % ========== IMAGE PREPROCESSING OPTIONS ==========
     ops.pre_processing = true;                  % Remove systematic grid line noise (microscope artifact)
     ops.bkg_subtraction = false;                % Background subtraction in time domain
     ops.tophat_max_dff  = true;                 % Tophat filter for uneven illumination correction
     ops.tophat_max_dff_r = 5;                   % Tophat filter radius [pixels]
     ops.use_binary_mask = true;                 % Use user-provided binary mask (ImageJ)
+    % Binary mask lookup settings
+    ops.binary_mask_location = "auto";         % "filedir" | "savedir" | "savedir_parent_recursive" | "auto"
+    ops.binary_mask_pattern_filedir = 'MAX_Cell*_binary_*.tif';
+    ops.binary_mask_pattern_savedir = 'Cell*_*_binary.tif';
+    ops.binary_mask_pattern_savedir_parent_recursive = 'Cell*_*_binary.tif';
+    ops.binary_mask_group_size = 4;             % target mask num = floor(n/group_size)+1 for savedir-based lookup
     ops.remove_px_with_no_spikes = true;        % Remove inactive pixels (set false for low SNR data)
     ops.redo_detection = true;                 % Reprocess if results already exist
 
@@ -80,6 +90,40 @@ function ops = config_evoked(ops)
     ops.ST.gap_thres        = 0.3;              % Gap threshold for spike identification [s]
     ops = spike_train_par(ops);
 
+    % Convert all time-based settings from seconds to frames once in config stage.
+    ops = unit_conversion(ops);
+
 
     
+end
+
+function ops = unit_conversion(ops)
+    % Unit conversion: Convert time-based parameters from seconds to frames
+    ops.sl_window          = round(ops.sl_window * ops.fs);
+    ops.sl_window_ST       = round(ops.sl_window_ST * ops.fs);
+
+    ops.spontaneous.rising_time_thres  = round(ops.spontaneous.rising_time_thres * ops.fs);
+    ops.spontaneous.maxISI             = round(ops.spontaneous.maxISI * ops.fs);
+    ops.spontaneous.findpeak_window    = round(ops.spontaneous.findpeak_window * ops.fs);
+    ops.spontaneous.peakWidth          = round(ops.spontaneous.peakWidth * ops.fs);
+    ops.spontaneous.MinPeakWidth       = round(ops.spontaneous.MinPeakWidth * ops.fs);
+
+    if ops.experiment_type == "evoked"
+        ops.(ops.experiment_type).rising_time_thres  = round(ops.(ops.experiment_type).rising_time_thres * ops.fs);
+        ops.(ops.experiment_type).maxISI             = round(ops.(ops.experiment_type).maxISI * ops.fs);
+        ops.(ops.experiment_type).findpeak_window    = round(ops.(ops.experiment_type).findpeak_window * ops.fs);
+        ops.(ops.experiment_type).peakWidth          = round(ops.(ops.experiment_type).peakWidth * ops.fs);
+        ops.(ops.experiment_type).MinPeakWidth       = round(ops.(ops.experiment_type).MinPeakWidth * ops.fs);
+
+        ops.stim_time = (0:ops.n_stim-1)/ops.stim_freq + ops.first_stim;
+        ops.stim_frames = round(ops.stim_time * ops.fs);
+        ops.stim_pk_search_range = arrayfun(@(x) x:x+ops.(ops.experiment_type).findpeak_window, ops.stim_frames, 'UniformOutput', false);
+        ops.stim_pk_search_range = reshape(ops.stim_pk_search_range,[],1);
+        ops.stim_pk_search_range = cell2mat(ops.stim_pk_search_range);
+        ops.len_spike = round(ops.len_spike * ops.fs);
+    end
+
+    ops.ST.sumOfPeak_window = round(ops.ST.sumOfPeak_window * ops.fs);
+    ops.ST.gaussian_window  = round(ops.ST.gaussian_window * ops.fs);
+    ops.ST.gap_thres        = round(ops.ST.gap_thres * ops.fs);
 end

@@ -10,6 +10,8 @@ from qtpy.QtCore import QSettings, Qt
 from qtpy.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
+    QComboBox,
+    QDoubleSpinBox,
     QFileDialog,
     QGridLayout,
     QGroupBox,
@@ -51,10 +53,13 @@ class EditMaskWidget(QWidget):
         self.scanned_root: Path = self.launch_root
         self.filtered_layer_to_path: Dict[str, Path] = {}
         self.baseline_filtered_masks: Dict[Path, np.ndarray] = {}
+        self.baseline_translation_offsets: Dict[Path, tuple[float, float]] = {}
         self._syncing_translation = False
 
         self._build_ui()
         self.viewer.mouse_drag_callbacks.append(self._on_viewer_mouse_drag)
+        self.viewer.layers.selection.events.active.connect(self._on_active_layer_changed)
+        self._apply_active_layer_bounding_box()
         self.viewer.window.qt_viewer.closeEvent_original = self.viewer.window.qt_viewer.closeEvent
         self.viewer.window.qt_viewer.closeEvent = self._on_window_close
 
@@ -74,6 +79,29 @@ class EditMaskWidget(QWidget):
 
         list_box = QGroupBox("2) File list (recursive)")
         list_box_layout = QVBoxLayout(list_box)
+
+        naming_layout = QGridLayout()
+        self.file_list_name_mode_combo = QComboBox()
+        self.file_list_name_mode_combo.addItem("Relative to root", "relative")
+        self.file_list_name_mode_combo.addItem("Filename only", "filename")
+        self.layer_name_mode_combo = QComboBox()
+        self.layer_name_mode_combo.addItem("Relative to root", "relative")
+        self.layer_name_mode_combo.addItem("Filename only", "filename")
+
+        list_mode = self.settings.value("display/file_list_mode", "relative", type=str)
+        layer_mode = self.settings.value("display/layer_name_mode", "filename", type=str)
+        self._set_combo_by_data(self.file_list_name_mode_combo, list_mode)
+        self._set_combo_by_data(self.layer_name_mode_combo, layer_mode)
+
+        self.file_list_name_mode_combo.currentIndexChanged.connect(self._on_name_display_changed)
+        self.layer_name_mode_combo.currentIndexChanged.connect(self._on_name_display_changed)
+
+        naming_layout.addWidget(QLabel("File list labels"), 0, 0)
+        naming_layout.addWidget(self.file_list_name_mode_combo, 0, 1)
+        naming_layout.addWidget(QLabel("Layer labels"), 0, 2)
+        naming_layout.addWidget(self.layer_name_mode_combo, 0, 3)
+        list_box_layout.addLayout(naming_layout)
+
         self.list_widget = QListWidget()
         self.list_widget.setSelectionMode(QAbstractItemView.MultiSelection)
         self.list_widget.itemSelectionChanged.connect(self._on_selection_changed)
@@ -100,7 +128,33 @@ class EditMaskWidget(QWidget):
         list_box_layout.addWidget(self.list_widget)
         list_box_layout.addLayout(nav_layout)
 
-        visibility_box = QGroupBox("3) Layer visibility")
+        sort_box = QGroupBox("3) Layer sorting")
+        sort_layout = QHBoxLayout(sort_box)
+
+        self.layer_sort_criteria_combo = QComboBox()
+        self.layer_sort_criteria_combo.addItem("Alphabetical", "alpha")
+        self.layer_sort_criteria_combo.addItem("Cell number", "cell")
+        self.layer_sort_criteria_combo.addItem("Recording number", "rec")
+        self.layer_sort_criteria_combo.addItem("Image type", "type")
+        sort_criteria = self.settings.value("display/layer_sort_criteria", "rec", type=str)
+        self._set_combo_by_data(self.layer_sort_criteria_combo, sort_criteria)
+
+        self.layer_sort_direction_combo = QComboBox()
+        self.layer_sort_direction_combo.addItem("Descending", "asc") # "Descending" means the largest numbers are loaded first, which would visually be at the bottom of the list in napari
+        self.layer_sort_direction_combo.addItem("Ascending", "desc")
+        sort_direction = self.settings.value("display/layer_sort_direction", "desc", type=str)
+        self._set_combo_by_data(self.layer_sort_direction_combo, sort_direction)
+
+        apply_sort_button = QPushButton("Sort layers")
+        apply_sort_button.clicked.connect(self._on_sort_layers_clicked)
+
+        sort_layout.addWidget(QLabel("Sort by"))
+        sort_layout.addWidget(self.layer_sort_criteria_combo)
+        sort_layout.addWidget(QLabel("Order"))
+        sort_layout.addWidget(self.layer_sort_direction_combo)
+        sort_layout.addWidget(apply_sort_button)
+
+        visibility_box = QGroupBox("4) Layer visibility")
         visibility_layout = QHBoxLayout(visibility_box)
         self.layer_visibility_checks: Dict[str, QCheckBox] = {}
 
@@ -118,7 +172,47 @@ class EditMaskWidget(QWidget):
             visibility_layout.addWidget(checkbox)
             self.layer_visibility_checks[suffix] = checkbox
 
-        translation_box = QGroupBox("4) Translation")
+        bbox_box = QGroupBox("5) Bounding box (active layer)")
+        bbox_layout = QGridLayout(bbox_box)
+
+        self.bbox_visible_check = QCheckBox("Visible")
+        self.bbox_visible_check.setChecked(True)
+        self.bbox_visible_check.toggled.connect(self._on_bbox_controls_changed)
+
+        self.bbox_color_combo = QComboBox()
+        self.bbox_color_combo.addItems([
+            "cyan",
+            "yellow",
+            "magenta",
+            "lime",
+            "red",
+            "blue",
+            "white",
+        ])
+        self.bbox_color_combo.setCurrentText("blue")
+        self.bbox_color_combo.currentTextChanged.connect(self._on_bbox_controls_changed)
+
+        self.bbox_thickness_spin = QSpinBox()
+        self.bbox_thickness_spin.setRange(1, 20)
+        self.bbox_thickness_spin.setValue(1)
+        self.bbox_thickness_spin.valueChanged.connect(self._on_bbox_controls_changed)
+
+        self.bbox_opacity_spin = QDoubleSpinBox()
+        self.bbox_opacity_spin.setRange(0.0, 1.0)
+        self.bbox_opacity_spin.setDecimals(2)
+        self.bbox_opacity_spin.setSingleStep(0.05)
+        self.bbox_opacity_spin.setValue(0.8)
+        self.bbox_opacity_spin.valueChanged.connect(self._on_bbox_controls_changed)
+
+        bbox_layout.addWidget(self.bbox_visible_check, 0, 0)
+        bbox_layout.addWidget(QLabel("Color"), 0, 1)
+        bbox_layout.addWidget(self.bbox_color_combo, 0, 2)
+        bbox_layout.addWidget(QLabel("Thickness"), 0, 3)
+        bbox_layout.addWidget(self.bbox_thickness_spin, 0, 4)
+        bbox_layout.addWidget(QLabel("Opacity"), 0, 5)
+        bbox_layout.addWidget(self.bbox_opacity_spin, 0, 6)
+
+        translation_box = QGroupBox("6) Translation")
         translation_layout = QGridLayout(translation_box)
 
         self.translate_dx_spin = QSpinBox()
@@ -130,8 +224,10 @@ class EditMaskWidget(QWidget):
 
         apply_step_button = QPushButton("Apply step")
         apply_step_button.clicked.connect(self._apply_translation_step)
-        reset_translation_button = QPushButton("Reset translation")
-        reset_translation_button.clicked.connect(self._reset_translation)
+        reset_translation_zero_button = QPushButton("Reset to zero")
+        reset_translation_zero_button.clicked.connect(self._reset_translation_zero)
+        reset_translation_saved_button = QPushButton("Reset to saved")
+        reset_translation_saved_button.clicked.connect(self._reset_translation_saved)
 
         left_button = QPushButton("Left")
         left_button.clicked.connect(lambda: self._nudge_translation(-1, 0))
@@ -149,17 +245,22 @@ class EditMaskWidget(QWidget):
         translation_layout.addWidget(QLabel("Step dy"), 0, 2)
         translation_layout.addWidget(self.translate_dy_spin, 0, 3)
         translation_layout.addWidget(apply_step_button, 0, 4)
-        translation_layout.addWidget(reset_translation_button, 0, 5)
+        translation_layout.addWidget(reset_translation_zero_button, 0, 5)
+        translation_layout.addWidget(reset_translation_saved_button, 0, 6)
         translation_layout.addWidget(left_button, 1, 0)
         translation_layout.addWidget(right_button, 1, 1)
         translation_layout.addWidget(up_button, 1, 2)
         translation_layout.addWidget(down_button, 1, 3)
         shortcut_note = QLabel("Keyboard nudge: Shift+Arrow")
-        translation_layout.addWidget(self.translation_status, 2, 0, 1, 6)
-        translation_layout.addWidget(shortcut_note, 3, 0, 1, 6)
+        translation_layout.addWidget(self.translation_status, 2, 0, 1, 7)
+        translation_layout.addWidget(shortcut_note, 3, 0, 1, 7)
 
-        edit_box = QGroupBox("5) Edit filtered mask")
+        edit_box = QGroupBox("7) Edit filtered mask")
         edit_layout = QGridLayout(edit_box)
+
+        self.safe_mode_button = QPushButton("Navigate (safe)")
+        self.safe_mode_button.setCheckable(True)
+        self.safe_mode_button.clicked.connect(lambda checked: self._on_tool_toggled("safe", checked))
 
         self.paint_button = QPushButton("Pencil")
         self.paint_button.setCheckable(True)
@@ -191,16 +292,17 @@ class EditMaskWidget(QWidget):
 
         undo_note = QLabel("Tip: Undo edits with Ctrl+Z")
 
-        edit_layout.addWidget(self.paint_button, 0, 0)
-        edit_layout.addWidget(self.erase_button, 0, 1)
-        edit_layout.addWidget(self.add_region_button, 0, 2)
-        edit_layout.addWidget(self.delete_region_button, 0, 3)
+        edit_layout.addWidget(self.safe_mode_button, 0, 0)
+        edit_layout.addWidget(self.paint_button, 0, 1)
+        edit_layout.addWidget(self.erase_button, 0, 2)
+        edit_layout.addWidget(self.add_region_button, 0, 3)
+        edit_layout.addWidget(self.delete_region_button, 0, 4)
         edit_layout.addWidget(brush_label, 1, 0)
-        edit_layout.addWidget(self.brush_slider, 1, 1, 1, 2)
-        edit_layout.addWidget(self.brush_size_value, 1, 3)
-        edit_layout.addWidget(undo_note, 2, 0, 1, 4)
+        edit_layout.addWidget(self.brush_slider, 1, 1, 1, 3)
+        edit_layout.addWidget(self.brush_size_value, 1, 4)
+        edit_layout.addWidget(undo_note, 2, 0, 1, 5)
 
-        save_box = QGroupBox("6) Save")
+        save_box = QGroupBox("8) Save")
         save_layout = QVBoxLayout(save_box)
         save_note = QLabel("Save overwrites *_mask_data.mat and writes *_binary.tif")
         self.unsaved_label = QLabel("No unsaved changes")
@@ -222,7 +324,9 @@ class EditMaskWidget(QWidget):
 
         root_layout.addWidget(root_box)
         root_layout.addWidget(list_box)
+        root_layout.addWidget(sort_box)
         root_layout.addWidget(visibility_box)
+        root_layout.addWidget(bbox_box)
         root_layout.addWidget(translation_box)
         root_layout.addWidget(edit_box)
         root_layout.addWidget(save_box)
@@ -273,10 +377,7 @@ class EditMaskWidget(QWidget):
         self.scanned_root = root
         self._store_last_root(root)
         self.records = self._discover_records(root)
-        self.list_widget.clear()
-
-        for rec in self.records:
-            self.list_widget.addItem(str(rec.mat_path.relative_to(root)))
+        self._refresh_file_list_items()
 
         if self.records:
             self.status_label.setText(f"Found {len(self.records)} mask-data files")
@@ -289,18 +390,8 @@ class EditMaskWidget(QWidget):
         return records
 
     def _dataset_key(self, mat_path: Path) -> str:
-        try:
-            rel = mat_path.relative_to(self.scanned_root)
-            label = str(rel)
-        except ValueError:
-            label = str(mat_path)
-
-        if label.endswith(MAT_SUFFIX):
-            label = label[: -len(MAT_SUFFIX)]
-        elif label.endswith(".mat"):
-            label = label[:-4]
-
-        return label
+        mode = self._layer_name_mode()
+        return self._dataset_key_for_mode(mat_path, mode)
 
     def _layer_name(self, mat_path: Path, suffix: str) -> str:
         return f"{self._dataset_key(mat_path)} | {suffix}"
@@ -310,6 +401,160 @@ class EditMaskWidget(QWidget):
             return str(mat_path.relative_to(self.scanned_root))
         except ValueError:
             return str(mat_path)
+
+    def _set_combo_by_data(self, combo: QComboBox, value: str) -> None:
+        idx = combo.findData(value)
+        if idx >= 0:
+            combo.setCurrentIndex(idx)
+
+    def _file_list_mode(self) -> str:
+        value = self.file_list_name_mode_combo.currentData()
+        return str(value) if value is not None else "relative"
+
+    def _layer_name_mode(self) -> str:
+        value = self.layer_name_mode_combo.currentData()
+        return str(value) if value is not None else "filename"
+
+    def _dataset_key_for_mode(self, mat_path: Path, mode: str) -> str:
+        if mode == "filename":
+            label = mat_path.name
+        else:
+            try:
+                label = str(mat_path.relative_to(self.scanned_root))
+            except ValueError:
+                label = str(mat_path)
+
+        if label.endswith(MAT_SUFFIX):
+            return label[: -len(MAT_SUFFIX)]
+        if label.endswith(".mat"):
+            return label[:-4]
+        return label
+
+    def _layer_name_for_mode(self, mat_path: Path, suffix: str, mode: str) -> str:
+        return f"{self._dataset_key_for_mode(mat_path, mode)} | {suffix}"
+
+    def _list_label_for_path(self, mat_path: Path) -> str:
+        if self._file_list_mode() == "filename":
+            return mat_path.name
+        return self._display_path(mat_path)
+
+    def _refresh_file_list_items(self) -> None:
+        selected_paths = set()
+        for idx in sorted({i.row() for i in self.list_widget.selectedIndexes()}):
+            if 0 <= idx < len(self.records):
+                selected_paths.add(self.records[idx].mat_path)
+
+        self.list_widget.clear()
+        for rec in self.records:
+            self.list_widget.addItem(self._list_label_for_path(rec.mat_path))
+
+        for i, rec in enumerate(self.records):
+            if rec.mat_path in selected_paths:
+                self.list_widget.item(i).setSelected(True)
+
+    def _find_existing_layer_name(self, mat_path: Path, suffix: str) -> Optional[str]:
+        for mode in ("relative", "filename"):
+            name = self._layer_name_for_mode(mat_path, suffix, mode)
+            if name in self.viewer.layers:
+                return name
+        current = self._layer_name(mat_path, suffix)
+        if current in self.viewer.layers:
+            return current
+        return None
+
+    def _refresh_loaded_layer_names(self) -> None:
+        suffixes = ["Projection", "Filtered image", "Unfiltered mask", "Filtered mask"]
+        for mat_path in self.loaded_files:
+            for suffix in suffixes:
+                old_name = self._find_existing_layer_name(mat_path, suffix)
+                if old_name is None:
+                    continue
+
+                new_name = self._layer_name(mat_path, suffix)
+                if old_name == new_name:
+                    continue
+
+                if new_name in self.viewer.layers:
+                    continue
+
+                self.viewer.layers[old_name].name = new_name
+
+        self.filtered_layer_to_path.clear()
+        for mat_path in self.loaded_files:
+            filtered_name = self._find_existing_layer_name(mat_path, "Filtered mask")
+            if filtered_name is not None:
+                self.filtered_layer_to_path[filtered_name] = mat_path
+
+    def _on_name_display_changed(self, _value=None) -> None:
+        self.settings.setValue("display/file_list_mode", self._file_list_mode())
+        self.settings.setValue("display/layer_name_mode", self._layer_name_mode())
+        self._refresh_file_list_items()
+        self._refresh_loaded_layer_names()
+        self._sort_loaded_layers()
+
+    def _on_sort_layers_clicked(self) -> None:
+        criteria = self.layer_sort_criteria_combo.currentData()
+        direction = self.layer_sort_direction_combo.currentData()
+        self.settings.setValue("display/layer_sort_criteria", criteria)
+        self.settings.setValue("display/layer_sort_direction", direction)
+        self._sort_loaded_layers()
+
+    def _dataset_sort_key(self, dataset_label: str) -> tuple:
+        """Primary sort key derived from dataset label, respecting selected criteria."""
+        criteria = getattr(self, "layer_sort_criteria_combo", None)
+        criteria = criteria.currentData() if criteria is not None else "alpha"
+
+        if criteria == "alpha":
+            return (dataset_label.lower(),)
+
+        # Try to extract CellX_n from the label.
+        import re
+        m = re.search(r'Cell(\d+)_(\d+)', dataset_label)
+        if criteria == "cell":
+            return (int(m.group(1)) if m else 0, int(m.group(2)) if m else 0, dataset_label.lower())
+        if criteria == "rec":
+            return (int(m.group(2)) if m else 0, int(m.group(1)) if m else 0, dataset_label.lower())
+
+        return (dataset_label.lower(),)
+
+    def _layer_sort_key(self, layer_name: str) -> tuple:
+        suffix_order = {
+            "Projection": 0,
+            "Filtered image": 1,
+            "Unfiltered mask": 2,
+            "Filtered mask": 3,
+        }
+        if " | " not in layer_name:
+            return (1, (layer_name.lower(),), 999, layer_name)
+
+        dataset_label, suffix = layer_name.rsplit(" | ", 1)
+        criteria = getattr(self, "layer_sort_criteria_combo", None)
+        criteria = criteria.currentData() if criteria is not None else "alpha"
+        if criteria == "type":
+            return (0, suffix_order.get(suffix, 999), dataset_label.lower(), layer_name)
+        return (0, self._dataset_sort_key(dataset_label), suffix_order.get(suffix, 999), layer_name)
+
+    def _sort_loaded_layers(self) -> None:
+        if len(self.viewer.layers) <= 1:
+            return
+
+        descending = False
+        direction_combo = getattr(self, "layer_sort_direction_combo", None)
+        if direction_combo is not None:
+            descending = direction_combo.currentData() == "desc"
+
+        sorted_layers = sorted(
+            list(self.viewer.layers),
+            key=lambda lyr: self._layer_sort_key(lyr.name),
+            reverse=descending,
+        )
+        desired_names = [lyr.name for lyr in sorted_layers]
+
+        for target_idx, name in enumerate(desired_names):
+            current_idx = next((i for i, lyr in enumerate(self.viewer.layers) if lyr.name == name), None)
+            if current_idx is None or current_idx == target_idx:
+                continue
+            self.viewer.layers.move(current_idx, target_idx)
 
     def _translation_setting_key(self, mat_path: Path) -> str:
         return str(mat_path.resolve()).replace("/", "__")
@@ -337,6 +582,61 @@ class EditMaskWidget(QWidget):
 
     def _on_selection_changed(self) -> None:
         self._update_translation_status()
+
+    def _on_bbox_controls_changed(self, _value=None) -> None:
+        self._apply_active_layer_bounding_box()
+
+    def _on_active_layer_changed(self, _event=None) -> None:
+        self._apply_active_layer_bounding_box()
+        self._update_translation_status()
+
+    def _apply_active_layer_bounding_box(self) -> None:
+        active_layer = self.viewer.layers.selection.active
+        bbox_visible = self.bbox_visible_check.isChecked() if hasattr(self, "bbox_visible_check") else True
+
+        # Disable global overlays so they do not outline all visible/selected layers.
+        list_overlay = getattr(self.viewer.layers, "bounding_box", None)
+        if list_overlay is not None and hasattr(list_overlay, "visible"):
+            list_overlay.visible = False
+
+        viewer_overlays = getattr(self.viewer, "overlays", None)
+        if viewer_overlays is not None:
+            for key in ("bounding_box", "selection_box"):
+                try:
+                    overlay_obj = viewer_overlays[key]
+                except Exception:
+                    overlay_obj = None
+                if overlay_obj is not None and hasattr(overlay_obj, "visible"):
+                    overlay_obj.visible = False
+
+        # Show layer-level bounding box for active layer only.
+        has_layer_level_bbox = False
+        for layer in self.viewer.layers:
+            layer_box = getattr(layer, "bounding_box", None)
+            if layer_box is None:
+                continue
+
+            should_show = bbox_visible and active_layer is not None and layer is active_layer
+            self._style_bounding_box_overlay(layer_box, should_show)
+            if should_show:
+                has_layer_level_bbox = True
+
+        if bbox_visible and active_layer is not None and not has_layer_level_bbox:
+            self.status_label.setText("Active-only bounding box is not supported in this napari version/layer type")
+
+    def _style_bounding_box_overlay(self, overlay_obj, visible: bool) -> None:
+        color = self.bbox_color_combo.currentText() if hasattr(self, "bbox_color_combo") else "cyan"
+        thickness = self.bbox_thickness_spin.value() if hasattr(self, "bbox_thickness_spin") else 5
+        opacity = self.bbox_opacity_spin.value() if hasattr(self, "bbox_opacity_spin") else 0.8
+
+        if hasattr(overlay_obj, "visible"):
+            overlay_obj.visible = visible
+        if hasattr(overlay_obj, "line_color"):
+            overlay_obj.line_color = color
+        if hasattr(overlay_obj, "line_thickness"):
+            overlay_obj.line_thickness = thickness
+        if hasattr(overlay_obj, "opacity"):
+            overlay_obj.opacity = opacity
 
     def _set_list_selection(self, select: bool) -> None:
         for i in range(self.list_widget.count()):
@@ -431,10 +731,13 @@ class EditMaskWidget(QWidget):
         projection_layer.events.translate.connect(lambda _e, p=mat_path: self._sync_translation_from_projection(p))
 
         self._set_brush_size(self.brush_slider.value())
-        self._activate_tool("paint")
+        self._activate_tool("safe")
         saved_dx, saved_dy = self._load_translation_offset(mat_path)
         if saved_dx != 0.0 or saved_dy != 0.0:
             self._set_translation_offset(mat_path, saved_dx, saved_dy)
+        self.baseline_translation_offsets[mat_path] = self._translation_offset(mat_path)
+        self._update_unsaved_for_path(mat_path)
+        self._sort_loaded_layers()
         self._update_translation_status()
 
     def _set_or_replace_image(self, name: str, arr: np.ndarray, colormap: str, opacity: float) -> None:
@@ -482,7 +785,7 @@ class EditMaskWidget(QWidget):
         if checked:
             self._activate_tool(tool)
         else:
-            self._activate_tool("paint")
+            self._activate_tool("safe")
 
     def _activate_tool(self, tool: str) -> None:
         layer = self._editable_layer()
@@ -490,6 +793,7 @@ class EditMaskWidget(QWidget):
             return
 
         buttons = {
+            "safe": self.safe_mode_button,
             "paint": self.paint_button,
             "erase": self.erase_button,
             "add_region": self.add_region_button,
@@ -501,7 +805,11 @@ class EditMaskWidget(QWidget):
             button.setChecked(key == tool)
             button.blockSignals(False)
 
-        if tool == "paint":
+        if tool == "safe":
+            self.region_action = None
+            layer.mode = "pan_zoom"
+            self.status_label.setText("Safe mode enabled (camera navigation only)")
+        elif tool == "paint":
             self.region_action = None
             layer.mode = "paint"
             layer.selected_label = 1
@@ -523,20 +831,38 @@ class EditMaskWidget(QWidget):
         if mat_path not in self.loaded_files:
             return
 
-        layer_name = self._layer_name(mat_path, "Filtered mask")
-        if layer_name not in self.viewer.layers:
+        layer_name = self._find_existing_layer_name(mat_path, "Filtered mask")
+        if layer_name is None or layer_name not in self.viewer.layers:
             return
 
         current_mask = (np.asarray(self.viewer.layers[layer_name].data) > 0).astype(np.uint8)
-        baseline = self.baseline_filtered_masks.get(mat_path)
-
-        if baseline is None:
+        if mat_path not in self.baseline_filtered_masks:
             self.baseline_filtered_masks[mat_path] = current_mask.copy()
-            self.unsaved_files.discard(mat_path)
-        elif current_mask.shape == baseline.shape and np.array_equal(current_mask, baseline):
-            self.unsaved_files.discard(mat_path)
-        else:
+
+        self._update_unsaved_for_path(mat_path)
+
+    def _update_unsaved_for_path(self, mat_path: Path) -> None:
+        if mat_path not in self.loaded_files:
+            return
+
+        layer_name = self._find_existing_layer_name(mat_path, "Filtered mask")
+        if layer_name is None or layer_name not in self.viewer.layers:
+            return
+
+        current_mask = (np.asarray(self.viewer.layers[layer_name].data) > 0).astype(np.uint8)
+        baseline_mask = self.baseline_filtered_masks.get(mat_path)
+        mask_changed = baseline_mask is not None and not (
+            current_mask.shape == baseline_mask.shape and np.array_equal(current_mask, baseline_mask)
+        )
+
+        current_dx, current_dy = self._translation_offset(mat_path)
+        baseline_dx, baseline_dy = self.baseline_translation_offsets.get(mat_path, (current_dx, current_dy))
+        translation_changed = abs(current_dx - baseline_dx) > 1e-6 or abs(current_dy - baseline_dy) > 1e-6
+
+        if mask_changed or translation_changed:
             self.unsaved_files.add(mat_path)
+        else:
+            self.unsaved_files.discard(mat_path)
 
         self._update_unsaved_label()
 
@@ -545,9 +871,14 @@ class EditMaskWidget(QWidget):
             self.unsaved_label.setText("No unsaved changes")
             self.unsaved_label.setStyleSheet("color: green;")
         else:
-            unsaved_names = ", ".join(self._display_path(p) for p in sorted(self.unsaved_files))
+            unsaved_names = ", ".join(self._unsaved_label_for_path(p) for p in sorted(self.unsaved_files))
             self.unsaved_label.setText(f"Modified but not saved: {unsaved_names}")
             self.unsaved_label.setStyleSheet("color: red;")
+
+    def _unsaved_label_for_path(self, mat_path: Path) -> str:
+        if self._file_list_mode() == "filename":
+            return self._dataset_key_for_mode(mat_path, "filename")
+        return self._list_label_for_path(mat_path)
 
     def _on_brush_size_changed(self, size: int) -> None:
         self.brush_size_value.blockSignals(True)
@@ -607,6 +938,7 @@ class EditMaskWidget(QWidget):
                 tr[-1] = float(dx)
                 layer.translate = tuple(tr)
         self._save_translation_offset(mat_path, float(dx), float(dy))
+        self._update_unsaved_for_path(mat_path)
         self._update_translation_status()
 
     def _apply_translation_delta(self, mat_path: Path, dx: float, dy: float) -> None:
@@ -644,12 +976,25 @@ class EditMaskWidget(QWidget):
             return
         self._apply_translation_delta(mat_path, dx, dy)
 
-    def _reset_translation(self) -> None:
+    def _reset_translation_zero(self) -> None:
         mat_path = self._get_active_dataset_path()
         if mat_path is None:
             self.status_label.setText("Select any layer from a loaded dataset first")
             return
         self._set_translation_offset(mat_path, 0.0, 0.0)
+
+    def _reset_translation_saved(self) -> None:
+        mat_path = self._get_active_dataset_path()
+        if mat_path is None:
+            self.status_label.setText("Select any layer from a loaded dataset first")
+            return
+
+        saved_dx, saved_dy = self.baseline_translation_offsets.get(mat_path, (0.0, 0.0))
+        self._set_translation_offset(mat_path, float(saved_dx), float(saved_dy))
+
+    def _reset_translation(self) -> None:
+        # Backward-compatible alias for any existing signal bindings.
+        self._reset_translation_zero()
 
     def _sync_translation_from_projection(self, mat_path: Path) -> None:
         if self._syncing_translation:
@@ -669,6 +1014,7 @@ class EditMaskWidget(QWidget):
                 self._save_translation_offset(mat_path, float(tr[-1]), float(tr[-2]))
         finally:
             self._syncing_translation = False
+        self._update_unsaved_for_path(mat_path)
         self._update_translation_status()
 
     def _on_viewer_mouse_drag(self, viewer, event) -> None:
@@ -745,8 +1091,6 @@ class EditMaskWidget(QWidget):
             self.status_label.setText("No active filtered mask layer")
             return
         self._save_single_file(mat_path)
-        self.unsaved_files.discard(mat_path)
-        self._update_unsaved_label()
 
     def _save_all_modified(self) -> None:
         if not self.unsaved_files:
@@ -755,7 +1099,6 @@ class EditMaskWidget(QWidget):
 
         for mat_path in list(self.unsaved_files):
             self._save_single_file(mat_path)
-        self.unsaved_files.clear()
         self._update_unsaved_label()
 
     def _save_single_file(self, mat_path: Path) -> None:
@@ -763,8 +1106,8 @@ class EditMaskWidget(QWidget):
             self.status_label.setText(f"File not loaded: {mat_path.name}")
             return
 
-        layer_name = self._layer_name(mat_path, "Filtered mask")
-        if layer_name not in self.viewer.layers:
+        layer_name = self._find_existing_layer_name(mat_path, "Filtered mask")
+        if layer_name is None or layer_name not in self.viewer.layers:
             self.status_label.setText(f"Layer not found: {layer_name}")
             return
 
@@ -782,6 +1125,8 @@ class EditMaskWidget(QWidget):
         tifffile.imwrite(binary_path, data * 255)
 
         self.baseline_filtered_masks[mat_path] = data.copy()
+        self.baseline_translation_offsets[mat_path] = self._translation_offset(mat_path)
+        self._update_unsaved_for_path(mat_path)
 
         self.status_label.setText(f"Saved: {mat_path.name}")
 
@@ -804,6 +1149,7 @@ class EditMaskWidget(QWidget):
         self.loaded_files.clear()
         self.unsaved_files.clear()
         self.baseline_filtered_masks.clear()
+        self.baseline_translation_offsets.clear()
         self.filtered_layer_to_path.clear()
         self._update_unsaved_label()
         self.status_label.setText("All files unloaded")

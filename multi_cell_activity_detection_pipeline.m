@@ -65,7 +65,6 @@ end
 % ========== FILE I/O PATHS ==========
 % path to data ; The script will loop through all subfolders.
 ops.filedir = '../../originals/test_data/'; % Input folder containing raw microscopy files
-ops.fileformat = '.cxd'; % File format to process (.cxd, .tif, .nd2, etc.)
 
 % path to saving directory
 ops.savedir = '../../outputs/test_data/'; % Output folder for results and figures
@@ -80,44 +79,12 @@ addpath('./Config/')                        % Configuration files
 ops = config_spontaneous(ops);              % Load default spontaneous configuration
 % ops = config_evoked(ops);                   % Load default evoked configuration
 
+
+
 %%
 if ~exist(ops.savedir, 'dir')
     mkdir(ops.savedir)
 end
-
-%% Unit conversion: Convert time-based parameters from seconds to frames
-% This allows all operations to work with frame indices instead of time values
-ops.sl_window          = round(ops.sl_window * ops.fs);              % Baseline window [frames]
-ops.sl_window_ST       = round(ops.sl_window_ST * ops.fs);           % Spike train window [frames]
-
-% Convert spontaneous event detection thresholds to frames
-ops.spontaneous.rising_time_thres  = round(ops.spontaneous.rising_time_thres * ops.fs);
-ops.spontaneous.maxISI             = round(ops.spontaneous.maxISI * ops.fs);
-ops.spontaneous.findpeak_window    = round(ops.spontaneous.findpeak_window * ops.fs);
-ops.spontaneous.peakWidth          = round(ops.spontaneous.peakWidth * ops.fs);
-ops.spontaneous.MinPeakWidth       = round(ops.spontaneous.MinPeakWidth * ops.fs);
-
-% Convert evoked parameters if running evoked experiment
-if ops.experiment_type == "evoked"
-    ops.(ops.experiment_type).rising_time_thres  = round(ops.(ops.experiment_type).rising_time_thres * ops.fs);
-    ops.(ops.experiment_type).maxISI             = round(ops.(ops.experiment_type).maxISI * ops.fs);
-    ops.(ops.experiment_type).findpeak_window    = round(ops.(ops.experiment_type).findpeak_window * ops.fs);
-    ops.(ops.experiment_type).peakWidth          = round(ops.(ops.experiment_type).peakWidth * ops.fs);
-    ops.(ops.experiment_type).MinPeakWidth       = round(ops.(ops.experiment_type).MinPeakWidth * ops.fs);
-
-    % Calculate stimulus timing in frames
-    ops.stim_time = (0:ops.n_stim-1)/ops.stim_freq + ops.first_stim;
-    ops.stim_frames = ops.stim_time * ops.fs;
-    ops.stim_pk_search_range = arrayfun(@(x) x:x+ops.(ops.experiment_type).findpeak_window, ops.stim_frames, 'UniformOutput', false);
-    ops.stim_pk_search_range = reshape(ops.stim_pk_search_range,[],1);
-    ops.stim_pk_search_range = cell2mat(ops.stim_pk_search_range);
-    ops.len_spike = ops.len_spike * ops.fs;
-end
-
-% Convert spike train parameters to frames
-ops.ST.sumOfPeak_window = round(ops.ST.sumOfPeak_window * ops.fs);
-ops.ST.gaussian_window  = round(ops.ST.gaussian_window * ops.fs);
-ops.ST.gap_thres        = round(ops.ST.gap_thres * ops.fs);
 
 %% Loop through all files in the input directory and process
 loop_through_folder(ops.filedir, ops);
@@ -150,7 +117,7 @@ function loop_through_folder(foldername, ops)
             
             loop_through_folder(fullfile(filelist(i).folder,filelist(i).name), ops);
 
-        elseif contains(filelist(i).name, ops.fileformat) % change file format
+        elseif contains(filelist(i).name, ops.fileformat) && ~isempty(regexp(filelist(i).name, ops.filename_regex, 'once'))
             ops.filename = fullfile(filelist(i).folder, filelist(i).name);
             
             % create new folder for saving data for each image file
@@ -180,8 +147,7 @@ disp(filename);
 
 %path to binary image
 if ops.use_binary_mask
-    ops.binary_file   = dir([foldername, filesep, 'MAX_Cell*_binary_*.tif']);
-    ops.binary_file = fullfile(ops.binary_file.folder, ops.binary_file.name);
+    ops.binary_file = resolve_binary_mask_file(ops, foldername, filename);
 end
 
 %% Turn off unnecessary warnings
@@ -1010,4 +976,120 @@ function D_matrix = compute_distance_matrix(event_cluster)
         end
     end
     D_matrix = D_matrix + D_matrix';  % Make symmetric for easier access
+end
+
+function binary_file = resolve_binary_mask_file(ops, data_folder, data_basename)
+    % Supports user-configurable locations/patterns from top-level ops fields.
+
+    cell_token = '';
+    image_rec_num = [];
+    token_match = regexp(data_basename, '^(Cell\d+)_\d+$', 'tokens', 'once');
+    if ~isempty(token_match)
+        cell_token = token_match{1};  % e.g., Cell1 from Cell1_4
+    else
+        token_match = regexp(data_basename, '^(Cell\d+)', 'tokens', 'once');
+        if ~isempty(token_match)
+            cell_token = token_match{1};
+        end
+    end
+
+    rec_match = regexp(data_basename, '^Cell\d+_(\d+)$', 'tokens', 'once');
+    if ~isempty(rec_match)
+        image_rec_num = str2double(rec_match{1});
+    end
+
+    target_savedir_num = [];
+    if ~isempty(image_rec_num)
+        target_savedir_num = floor(image_rec_num/ops.binary_mask_group_size) + 1;
+    end
+
+    candidates = {};
+
+    % Defaults for backward compatibility
+    if ~isfield(ops, 'binary_mask_location')
+        ops.binary_mask_location = "auto";
+    end
+    if ~isfield(ops, 'binary_mask_pattern_filedir')
+        ops.binary_mask_pattern_filedir = 'MAX_Cell*_binary_*.tif';
+    end
+    if ~isfield(ops, 'binary_mask_pattern_savedir')
+        ops.binary_mask_pattern_savedir = 'Cell*_*_binary.tif';
+    end
+    if ~isfield(ops, 'binary_mask_pattern_savedir_parent_recursive')
+        ops.binary_mask_pattern_savedir_parent_recursive = 'Cell*_*_binary.tif';
+    end
+    if ~isfield(ops, 'binary_mask_group_size')
+        ops.binary_mask_group_size = 4;
+    end
+
+    mode = lower(string(ops.binary_mask_location));
+
+    if mode == "filedir" || mode == "auto"
+        candidates = [candidates; collect_candidates(data_folder, ops.binary_mask_pattern_filedir, cell_token, false)]; %#ok<AGROW>
+    end
+
+    if mode == "savedir" || mode == "auto"
+        candidates = [candidates; collect_candidates(ops.savedir, ops.binary_mask_pattern_savedir, cell_token, false, target_savedir_num)]; %#ok<AGROW>
+    end
+
+    save_parent = fileparts(ops.savedir);
+    if (mode == "savedir_parent_recursive" || mode == "auto") && ~isempty(save_parent)
+        candidates = [candidates; collect_candidates(save_parent, ops.binary_mask_pattern_savedir_parent_recursive, cell_token, true, target_savedir_num)]; %#ok<AGROW>
+    end
+
+    if mode ~= "filedir" && mode ~= "savedir" && mode ~= "savedir_parent_recursive" && mode ~= "auto"
+        error('Invalid ops.binary_mask_location: %s', string(ops.binary_mask_location));
+    end
+
+    % De-duplicate while preserving first-hit priority from the search order above
+    if isempty(candidates)
+        error(['Binary mask not found for ', data_basename, '. Mode: ', char(mode), '. Patterns: ', ...
+               ops.binary_mask_pattern_filedir, ' | ', ...
+               ops.binary_mask_pattern_savedir, ' | ', ...
+               ops.binary_mask_pattern_savedir_parent_recursive, ...
+               '. Target savedir mask num: ', num2str(target_savedir_num)]);
+    end
+    candidates = unique(candidates, 'stable');
+
+    if numel(candidates) > 1
+        warning('Multiple binary masks found for %s. Using first match: %s', data_basename, candidates{1});
+    end
+    binary_file = candidates{1};
+end
+
+function paths = dir_to_fullpaths(d)
+    if isempty(d)
+        paths = {};
+        return
+    end
+    paths = arrayfun(@(x) fullfile(x.folder, x.name), d, 'UniformOutput', false)';
+end
+
+function paths = collect_candidates(base_dir, pattern, cell_token, recursive_search, desired_num)
+    patterns = {pattern};
+    if ~isempty(cell_token) && contains(pattern, 'Cell*')
+        patterns = [{strrep(pattern, 'Cell*', cell_token)}, patterns];
+    end
+
+    paths = {};
+    for i = 1:numel(patterns)
+        if recursive_search
+            d = dir(fullfile(base_dir, '**', patterns{i}));
+        else
+            d = dir(fullfile(base_dir, patterns{i}));
+        end
+        paths = [paths; dir_to_fullpaths(d)]; %#ok<AGROW>
+    end
+
+    if nargin >= 5 && ~isempty(desired_num)
+        keep_idx = false(numel(paths), 1);
+        for i = 1:numel(paths)
+            [~, mask_name, mask_ext] = fileparts(paths{i});
+            token = regexp([mask_name, mask_ext], '^Cell\d+_(\d+)_binary\.tif$', 'tokens', 'once');
+            if ~isempty(token) && str2double(token{1}) == desired_num
+                keep_idx(i) = true;
+            end
+        end
+        paths = paths(keep_idx);
+    end
 end

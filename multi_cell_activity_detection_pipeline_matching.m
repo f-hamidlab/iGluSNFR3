@@ -66,14 +66,11 @@ end
 % path to data ; The script will loop through all subfolders.
 % ops.filedir = '../../originals/test_data/'; % Input folder containing raw microscopy files
 % ops.filedir = '../../originals/iGluSNFR3 evoked 250312 Halo C/'; % Input folder containing raw microscopy files
-% ops.fileformat = '.cxd'; % File format to process (.cxd, .tif, .nd2, etc.)
-ops.filedir = '../../originals/iGluSNFR3 evoked 250312 Halo C/Image1_test_data/'; % Input folder containing raw microscopy files
-ops.fileformat = '.tif'; % File format to process (.cxd, .tif, .nd2, etc.)
-ops.filename_regex = ['^Cell\d+_(\d+)', ops.fileformat,'$']; % Regular expression for filename matching (e.g., "Cell1_1.tif") - ^ and $ ensure exact match
+ops.filedir = '../../originals/iGluSNFR3 evoked 250312 Halo C/Image1/'; % Input folder containing raw microscopy files
 
 % path to saving directory
 % ops.savedir = '../../outputs/iGluSNFR3 evoked 250312 Halo C/'; % Output folder for results and figures
-ops.savedir = '../../outputs/iGluSNFR3 evoked 250312 Halo C/Image1_test_data/'; % Output folder for results and figures
+ops.savedir = '../../outputs/iGluSNFR3 evoked 250312 Halo C/Image1/'; % Output folder for results and figures
 
 % ========== ADD DEPENDENCIES TO PATH ==========
 addpath('./Scripts/')                       % Core analysis scripts
@@ -83,8 +80,10 @@ addpath('./Scripts/MLspike/spikes/')        % Spike detection functions
 addpath('./Config/')                        % Configuration files  
 
 % Load default evoked configuration
-ops_multi = config_evoked_multi_spec_test_data(ops);  % Load evoked configuration
+ops_multi = config_evoked_multi_spec(ops);  % Load evoked configuration
 ops = ops_multi{1};                         % Use first config as base, will customize per dataset
+
+
 
 %%
 if ~exist(ops.savedir, 'dir')
@@ -140,12 +139,8 @@ function loop_through_folder(foldername, ops, ops_multi)
             img_num = regexp(filename, regex_pattern, 'tokens');
             if ~isempty(img_num)
                 img_num = str2double(img_num{1}{1});
-                if img_num <= length(ops_multi)
-                    ops_customized = ops_multi{img_num}; % Use specific config for this image
-                else
-                    warning('Image number exceeds config length. Using default config.')
-                    ops_customized = ops; % Use default config if no specific one
-                end
+                cfg_idx = mod(img_num - 1, length(ops_multi)) + 1;
+                ops_customized = ops_multi{cfg_idx}; % Loop through configs cyclically
             else
                 warning('Could not extract image number from filename. Using default config.')
                 ops_customized = ops; % Use default config if no image number found
@@ -188,8 +183,7 @@ disp(filename);
 
 %path to binary image
 if ops.use_binary_mask
-    ops.binary_file   = dir([foldername, filesep, 'MAX_Cell*_binary_*.tif']);
-    ops.binary_file = fullfile(ops.binary_file.folder, ops.binary_file.name);
+    ops.binary_file = resolve_binary_mask_file(ops, foldername, filename);
 end
 
 %% Turn off unnecessary warnings
@@ -1026,4 +1020,144 @@ function D_matrix = compute_distance_matrix(event_cluster)
         end
     end
     D_matrix = D_matrix + D_matrix';  % Make symmetric for easier access
+end
+
+function binary_file = resolve_binary_mask_file(ops, data_folder, data_basename)
+    % Supports user-configurable locations/patterns from top-level ops fields.
+
+    % Defaults for backward compatibility
+    if ~isfield(ops, 'binary_mask_location')
+        ops.binary_mask_location = "auto";
+    end
+    if ~isfield(ops, 'binary_mask_pattern_filedir')
+        ops.binary_mask_pattern_filedir = 'MAX_Cell*_binary_*.tif';
+    end
+    if ~isfield(ops, 'binary_mask_pattern_savedir')
+        ops.binary_mask_pattern_savedir = 'Cell*_*_binary.tif';
+    end
+    if ~isfield(ops, 'binary_mask_pattern_savedir_parent_recursive')
+        ops.binary_mask_pattern_savedir_parent_recursive = 'Cell*_*_binary.tif';
+    end
+    if ~isfield(ops, 'binary_mask_group_size')
+        ops.binary_mask_group_size = 4;
+    end
+
+    cell_token = '';
+    image_rec_num = [];
+    token_match = regexp(data_basename, '^(Cell\d+)_\d+$', 'tokens', 'once');
+    if ~isempty(token_match)
+        cell_token = token_match{1};  % e.g., Cell1 from Cell1_4
+    else
+        token_match = regexp(data_basename, '^(Cell\d+)', 'tokens', 'once');
+        if ~isempty(token_match)
+            cell_token = token_match{1};
+        end
+    end
+
+    rec_match = regexp(data_basename, '^Cell\d+_(\d+)$', 'tokens', 'once');
+    if ~isempty(rec_match)
+        image_rec_num = str2double(rec_match{1});
+    end
+
+    target_savedir_num = [];
+    if ~isempty(image_rec_num)
+        target_savedir_num = floor((image_rec_num - 1) / ops.binary_mask_group_size) * ops.binary_mask_group_size + 1;
+    end
+
+    candidates = {};
+
+    mode = lower(string(ops.binary_mask_location));
+
+    if mode == "filedir" || mode == "auto"
+        candidates = [candidates; collect_candidates(data_folder, ops.binary_mask_pattern_filedir, cell_token, false, target_savedir_num)]; %#ok<AGROW>
+    end
+
+    if mode == "savedir" || mode == "auto"
+        candidates = [candidates; collect_candidates(ops.savedir, ops.binary_mask_pattern_savedir, cell_token, false, target_savedir_num)]; %#ok<AGROW>
+    end
+
+    save_parent = fileparts(ops.savedir);
+    if (mode == "savedir_parent_recursive" || mode == "auto") && ~isempty(save_parent)
+        candidates = [candidates; collect_candidates(save_parent, ops.binary_mask_pattern_savedir_parent_recursive, cell_token, true, target_savedir_num)]; %#ok<AGROW>
+    end
+
+    if mode ~= "filedir" && mode ~= "savedir" && mode ~= "savedir_parent_recursive" && mode ~= "auto"
+        error('Invalid ops.binary_mask_location: %s', string(ops.binary_mask_location));
+    end
+
+    % De-duplicate while preserving first-hit priority from the search order above
+    if isempty(candidates)
+        error(['Binary mask not found for ', data_basename, '. Mode: ', char(mode), '. Patterns: ', ...
+               ops.binary_mask_pattern_filedir, ' | ', ...
+               ops.binary_mask_pattern_savedir, ' | ', ...
+               ops.binary_mask_pattern_savedir_parent_recursive, ...
+               '. Target savedir mask num: ', num2str(target_savedir_num)]);
+    end
+    candidates = unique(candidates, 'stable');
+
+    if numel(candidates) > 1
+        warning('Multiple binary masks found for %s. Using first match: %s', data_basename, candidates{1});
+    end
+    binary_file = candidates{1};
+end
+
+function paths = dir_to_fullpaths(d)
+    if isempty(d)
+        paths = {};
+        return
+    end
+    paths = arrayfun(@(x) fullfile(x.folder, x.name), d, 'UniformOutput', false)';
+end
+
+function paths = collect_candidates(base_dir, pattern, cell_token, recursive_search, desired_num)
+    patterns = {pattern};
+    if ~isempty(cell_token) && contains(pattern, 'Cell*')
+        patterns = [{strrep(pattern, 'Cell*', cell_token)}, patterns];
+    end
+
+    paths = {};
+    for i = 1:numel(patterns)
+        if recursive_search
+            d = dir(fullfile(base_dir, '**', patterns{i}));
+        else
+            d = dir(fullfile(base_dir, patterns{i}));
+        end
+        paths = [paths; dir_to_fullpaths(d)]; %#ok<AGROW>
+    end
+
+    if nargin >= 5 && ~isempty(desired_num)
+        keep_idx = false(numel(paths), 1);
+        for i = 1:numel(paths)
+            [~, mask_name, mask_ext] = fileparts(paths{i});
+            file_label = [mask_name, mask_ext];
+
+            % Supports both mask naming styles:
+            %   1) CellX_Y_binary.tif
+            %   2) MAX_CellX_binary_Y.tif
+            token = regexp(file_label, '^Cell\d+_(\d+)_binary\.tif$', 'tokens', 'once');
+            if ~isempty(token)
+                mask_num = str2double(token{1});
+            else
+                token = regexp(file_label, '^MAX_Cell\d+_binary_(\d+)\.tif$', 'tokens', 'once');
+                if ~isempty(token)
+                    mask_num = str2double(token{1});
+                else
+                    mask_num = extract_last_integer(file_label);
+                end
+            end
+
+            if ~isnan(mask_num) && mask_num == desired_num
+                keep_idx(i) = true;
+            end
+        end
+        paths = paths(keep_idx);
+    end
+end
+
+function out = extract_last_integer(s)
+    out = NaN;
+    nums = regexp(s, '(\d+)', 'tokens');
+    if ~isempty(nums)
+        out = str2double(nums{end}{1});
+    end
 end

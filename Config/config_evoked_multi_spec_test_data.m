@@ -6,7 +6,7 @@ function ops_multi = config_evoked_multi_spec_test_data(ops)
     ops_multi = cell(1, N);
     for i = 1:N
         % Initialize each ops structure with default parameters
-        ops_multi{i} = default_evoked_spec(ops);
+        ops_multi{i} = default_evoked_spec(ops, N);
     end
 
     % Customize parameters for each image as needed
@@ -20,13 +20,23 @@ function ops_multi = config_evoked_multi_spec_test_data(ops)
     
 end
 
-function ops = default_evoked_spec(ops)
+function ops = default_evoked_spec(ops, n_specs)
+    % ========== INPUT FILE MATCHING ==========
+    ops.fileformat = '.tif';
+    ops.filename_regex = ['^Cell\d+_(\d+)', ops.fileformat, '$']; % customize this regex to match your filenames and extract relevant info (e.g. cell and session numbers)
+
     % ========== IMAGE PREPROCESSING OPTIONS ==========
     ops.pre_processing = true;                  % Remove systematic grid line noise (microscope artifact)
     ops.bkg_subtraction = false;                % Background subtraction in time domain
     ops.tophat_max_dff  = true;                 % Tophat filter for uneven illumination correction
     ops.tophat_max_dff_r = 5;                   % Tophat filter radius [pixels]
     ops.use_binary_mask = true;                 % Use user-provided binary mask (ImageJ)
+    % Binary mask lookup settings
+    ops.binary_mask_location = "auto";         % "filedir" | "savedir" | "savedir_parent_recursive" | "auto"
+    ops.binary_mask_pattern_filedir = 'MAX_Cell*_binary_*.tif';
+    ops.binary_mask_pattern_savedir = 'Cell*_*_binary.tif';
+    ops.binary_mask_pattern_savedir_parent_recursive = 'Cell*_*_binary.tif';
+    ops.binary_mask_group_size = n_specs;       % number of recordings that reference the same binary mask; synced to top-level N
     ops.remove_px_with_no_spikes = true;        % Remove inactive pixels (set false for low SNR data)
     ops.redo_detection = true;                 % Reprocess if results already exist
 
