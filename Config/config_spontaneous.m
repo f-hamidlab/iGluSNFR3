@@ -1,7 +1,7 @@
 function ops = config_spontaneous(ops)
     % ========== INPUT FILE MATCHING ==========
     ops.fileformat = '.cxd';                   % File format to process (.cxd, .tif, .nd2, etc.)
-    ops.filename_regex = ['^.*', regexptranslate('escape', ops.fileformat), '$'];
+    ops.filename_regex = ['^.*', regexptranslate('escape', ops.fileformat), '$']; % for generic matching; customize if needed (e.g. '^Cell\d+_(\d+).cxd$' to extract cell and session numbers)
 
     % ========== IMAGE PREPROCESSING OPTIONS ==========
     ops.pre_processing = true;                  % Remove systematic grid line noise (microscope artifact)

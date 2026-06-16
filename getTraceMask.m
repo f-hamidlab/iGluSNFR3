@@ -9,13 +9,13 @@ end
 
 % ========== FILE I/O PATHS ==========
 % The script loops recursively through filedir and processes files with index suffix k*n + 1.
-ops.filedir = '../../originals/iGluSNFR3 evoked 250312 Halo C/Image1/';
+ops.filedir = '../../originals/data20260616/';
 ops.fileformat = '.cxd';
 ops.base_filename_regex = ['^Cell.*_(\d+)', regexptranslate('escape', ops.fileformat), '$'];
 ops.index_multiplier = 4;          % Files with index = (index_multiplier*n + 1) are processed, n starts from 0. For example, if index_multiplier=4, files with indices 1, 5, 9, ... are processed.
 
 % Path to saving directory
-ops.savedir = '../../outputs/iGluSNFR3 evoked 250312 Halo C/Image1/';
+ops.savedir = '../../outputs/data20260616/';
 
 addpath('./Scripts/')                       % Core analysis scripts
 addpath('./Scripts/bfmatlab/')              % Bio-Format Toolbox
@@ -25,7 +25,7 @@ addpath('./Scripts/frangi_filter_version2a/')    % Frangi filter
 ops.tophat_r = 2;                 % Tophat filter radius [pixels]
 ops.min_area = 200;               % Minimum area threshold (adjust based on data)
 ops.min_length = 10;              % Reserved for optional shape-based filtering
-ops.visualize = false;            % true: show intermediate figure for each file
+ops.visualize = true;            % true: show intermediate figure for each file
 ops.save_figure = false;          % true: save intermediate figure in output folder
 
 if ~exist(ops.savedir, 'dir')
@@ -172,6 +172,11 @@ function process_single_file(ops)
     level = graythresh(im_filtered);
     binary_mask = imbinarize(im_filtered, level);
 
+    while sum(binary_mask(:)) < 1000
+        level = level * 0.5;  % Adjust threshold if too few pixels are detected
+        binary_mask = imbinarize(im_filtered, level);
+    end
+
     % Estimate and subtract cell body mask
     level_cell_body = graythresh(im_denoised);
     binary_mask_cell_body = imbinarize(im_denoised, level_cell_body);
@@ -184,8 +189,11 @@ function process_single_file(ops)
         cell_body_mask(cc_body.PixelIdxList{idx}) = true;
     end
 
-    neurite_mask = binary_mask & ~cell_body_mask;
-
+    se = strel('disk', 10);
+    cell_body_mask = imopen(cell_body_mask, se);
+   
+    neurite_mask = binary_mask & ~cell_body_mask;  
+  
     if ops.visualize
         overlay = zeros(size(binary_mask, 1), size(binary_mask, 2), 3);
         overlay(:, :, 1) = cell_body_mask;
