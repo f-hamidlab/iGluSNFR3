@@ -46,8 +46,7 @@ function ops = default_evoked_spec(ops, n_specs)
     ops.binary_mask_pattern_savedir_parent_recursive = 'Cell*_*_binary.tif';
     ops.binary_mask_group_size         = n_specs;  % number of recordings that reference the same binary mask; synced to top-level N
     ops.remove_px_with_no_spikes       = true;     % Remove inactive pixels (set false for low SNR data)
-    ops.remove_ST                      = true;     % Remove any event_cluster that contains spike train
-    ops.redo_detection                 = true;     % Reprocess if results already exist
+    ops.redo_detection                 = false;     % Reprocess if results already exist
 
     % ========== VISUALIZATION & OUTPUT OPTIONS ==========
     ops.plot_pxMap = false;                     % Plot pixel map for each ROI (memory intensive)
@@ -90,6 +89,7 @@ function ops = default_evoked_spec(ops, n_specs)
     ops.n_stim          = 15;                   % Total number of stimuli
     ops.stim_freq       =  1;                   % Stimulation frequency [Hz]
     ops.len_spike       =  2;                   % Expected response duration [s] from stim onset
+    ops.remove_ST       = true;                 % Remove 
 
     % ========== EVOKED EVENT DETECTION PARAMETERS (if experiment_type == "evoked") ==========
     ops.evoked.rising_time_thres  = 0.15;      % Minimum response rise time [s]

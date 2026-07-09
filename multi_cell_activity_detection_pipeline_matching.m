@@ -1,4 +1,4 @@
-1%% SPONTANEOUS ACTIVITY DETECTION PIPELINE
+%% SPONTANEOUS ACTIVITY DETECTION PIPELINE
 % Comprehensive pipeline for detecting synaptic events in single-plane widefield fluorescence imaging
 % 
 % DESCRIPTION:
@@ -47,7 +47,7 @@
 %   3. Run script: it will recursively process all files in filedir
 %   4. Set ops.visualize = false to disable figure generation (faster)
 %
-% Last modified: 2026-02-09 16:25
+% Last modified: 2026-07-08 17:42
 % Current branch: main | Status: Production-ready with optimizations
 
 close all
@@ -64,13 +64,10 @@ end
 
 % ========== FILE I/O PATHS ==========
 % path to data ; The script will loop through all subfolders.
-% ops.filedir = '../../originals/test_data/'; % Input folder containing raw microscopy files
-% ops.filedir = '../../originals/iGluSNFR3 evoked 250312 Halo C/'; % Input folder containing raw microscopy files
-ops.filedir = '../../originals/iGluSNFR3 evoked 250312 Halo C/Image1/'; % Input folder containing raw microscopy files
+ops.filedir = '../../originals/260331 B Cell 4 part 1/originals/'; % Input folder containing raw microscopy files
 
 % path to saving directory
-% ops.savedir = '../../outputs/iGluSNFR3 evoked 250312 Halo C/'; % Output folder for results and figures
-ops.savedir = '../../outputs/iGluSNFR3 evoked 250312 Halo C/Image1/'; % Output folder for results and figures
+ops.savedir = '../../originals/260331 B Cell 4 part 1/outputs/'; % Output folder for results and figures
 
 % ========== ADD DEPENDENCIES TO PATH ==========
 addpath('./Scripts/')                       % Core analysis scripts
@@ -218,8 +215,6 @@ disp('Loading data ...')
 % Returns: im_data (Ny × Nx × Nt), ops (with Ny, Nx, Nt populated)
 [im_data, ops] = loadBioFormats(ops);
 
-% Convert to double precision for numerical operations
-im_data = double(im_data);
 % Create time vector in seconds: [0, dt, 2*dt, ..., (Nt-1)*dt]
 ops.t = ((0: 1:ops.Nt-1)/ops.fs)';
 
@@ -227,31 +222,30 @@ ops.t = ((0: 1:ops.Nt-1)/ops.fs)';
 im_data(:,:,1) = im_data(:,:,2);
 
 % ========== STAGE 2: PREPROCESSING - Remove systematic noise ==========
+% Convert to double precision for numerical operations
+im_data = double(im_data);
+
 % This step removes row/column systematic noise common in some microscopes
-if ops.pre_processing
+if ops.remove_grid_noise
     tic;
-    disp('Pre_processing: de-noise ...')    
+    disp('Pre-processing: de-noising ...')    
     
     % Remove row-wise systematic noise (e.g., scanner oscillations)
     % Divide each row by its low percentile value across time
     p = 5;  % 5th percentile - robust to transient signals
-    rowMeans = prctile(im_data, p, 2);  % Ny × Nx × 1
+    rowMeans = max(prctile(im_data, p, 2), eps);  % Ny × Nx × 1
     im_data = im_data ./ rowMeans;  % Broadcasting: implicit expansion
     
     % Remove column-wise systematic noise (often different top vs bottom)
     % Many microscopes have gradient noise in Y direction
     
     % Process top half
-    colMeans1 = prctile(im_data(1:ops.Ny/2, :, :), p, 1);
+    colMeans1 = max(prctile(im_data(1:ops.Ny/2, :, :), p, 1), eps);
     im_data(1:ops.Ny/2, :, :) = im_data(1:ops.Ny/2, :, :) ./ colMeans1;  % Broadcasting
     
     % Process bottom half (separate normalization for different noise profile)
-    colMeans2 = prctile(im_data(ops.Ny/2+1:end,:,:), p, 1);
+    colMeans2 = max(prctile(im_data(ops.Ny/2+1:end,:,:), p, 1), eps);
     im_data(ops.Ny/2+1:end,:,:) = im_data(ops.Ny/2+1:end,:,:) ./ colMeans2;  % Broadcasting
-
-    % Save denoised image for quality control
-    options.overwrite = true;
-    saveastiff(im_data, strcat(ops.savedir, filesep, 'denoised_im.tif'), options)
 
     % Visualize systematic noise patterns (optional)
     if ops.visualize
@@ -283,6 +277,48 @@ if ops.pre_processing
     toc;
 end
 
+% Registration (optional): Align frames to correct for motion artifacts
+if ops.registration_within_recording
+    tic;
+    disp('Pre-processing: registering, round ...')
+
+    % Calculate registration transforms
+    % Set fit paramters and registration type.
+    [optimizer, metric] = imregconfig('monomodal');
+
+    % Fixed reference: frame 1 (sharp, no oscillation blur)
+    ref_image = im_data(:,:,1);
+    
+    sameAsInput = imref2d(size(im_data(:,:,1)));
+    Ireg = zeros(size(im_data));
+    Ireg(:,:,1) = im_data(:,:,1);  % identity transform
+
+    for n = 2:ops.Nt
+        if mod(n, 100) == 0
+            fprintf("Processing frame %d/%d\n", n, ops.Nt);
+        end
+        tform_n = imregtform(im_data(:,:,n), ref_image, ...
+            ops.registration_type, optimizer, metric);
+        Ireg(:,:,n) = imwarp(im_data(:,:,n), tform_n, ...
+            'FillValues', 0, 'OutputView', sameAsInput);
+    end
+
+    im_data = Ireg;  % Replace original data with registered data
+    clear Ireg
+    toc; 
+
+end
+
+if ops.save_registered_tif
+    tic;
+    disp('Saving registered movie ...')
+    % Save registered movie for quality control
+    options.overwrite = true;
+    saveastiff(im_data, strcat(ops.savedir, filesep, 'registered_im.tif'), options)
+    toc;
+end
+
+
 % ========== Reshape data for pixel-level processing ==========
 % Reshape: (Ny × Nx × Nt) → (Ny*Nx × Nt) = (n_pixels × n_timepoints)
 data1 = reshape(im_data, [], ops.Nt);
@@ -291,9 +327,10 @@ toc
 
 % ========== STAGE 3: INITIAL IMAGE ANALYSIS ==========
 % Display first frame for quality inspection
+first_frame = squeeze(im_data(:,:,1));
 if ops.visualize
     fig_handle = figure;
-    imagesc(squeeze(im_data(:,:,1)))
+    imagesc(first_frame)
     title(sprintf('Frame %d - Raw Intensity', 1))
     xlabel('X [px]')
     ylabel('Y [px]')
@@ -322,9 +359,10 @@ disp('Screening pixels...')
 
 % assuming prominent signal with little drifting
 max_data = max(im_data,[],3);
-median_data = median(im_data,3);
+median_data = max(median(im_data,3), eps); % avoid division by zero
 max_df = max_data-median_data;
 max_dff = max_df./median_data;
+max_dff(median_data <= eps) = 0;
 
 if ops.visualize
     fig_handle = figure;
@@ -411,7 +449,7 @@ if ops.use_binary_mask
     fig_handle = figure;
     sgtitle("Signal in binary mask")
     
-    tiledlayout(2,1)
+    tiledlayout('vertical')
     nexttile
     hold on
     plot(ops.t, mask.signal_raw, 'b')
@@ -428,6 +466,11 @@ if ops.use_binary_mask
     yline(0)
     ylabel('\DeltaF/F')
     xlabel('Time [s]')
+
+    if ~isMATLABReleaseOlderThan("R2026a") % usage of function cwt() is updated in 2026a
+        ax1 = nexttile;
+        cwt(mask.signal_dfof, ops.fs, Parent=ax1);
+    end
 
     % save figure
     fig_name = 'Fig4_1_MaskedDFoF';
@@ -689,7 +732,9 @@ end
 for n = 1:size(ROI,1)
     event_cluster = cluster_events(ROI,event_cluster,n);
 end
-event_cluster = event_cluster'; % correct dimension
+if size(event_cluster,1) < size(event_cluster,2)
+    event_cluster = event_cluster'; % correct dimension
+end
 
 % remove cluster with no event
 event_cluster = event_cluster([event_cluster.n_spikes] > 0);
@@ -810,7 +855,9 @@ for i = 1:length(ROI)
     end 
 end
 
-
+if ops.remove_ST
+    event_cluster([event_cluster.ST]==1) = [];
+end
 
 %% plot signal for each ROI (overall)
 if ops.plot_ROI_overall_signal
@@ -1122,7 +1169,18 @@ function paths = collect_candidates(base_dir, pattern, cell_token, recursive_sea
         else
             d = dir(fullfile(base_dir, patterns{i}));
         end
-        paths = [paths; dir_to_fullpaths(d)]; %#ok<AGROW>
+        
+        newpaths = dir_to_fullpaths(d); 
+        % Normalize to a column cell array of char 
+        if isempty(newpaths) 
+            newpaths = {}; 
+        elseif ischar(newpaths) 
+            newpaths = {newpaths}; 
+        elseif isstring(newpaths) 
+            newpaths = cellstr(newpaths); 
+        end 
+        newpaths = newpaths(:);  % force column 
+        paths = [paths; newpaths];  %#ok<AGROW>
     end
 
     if nargin >= 5 && ~isempty(desired_num)

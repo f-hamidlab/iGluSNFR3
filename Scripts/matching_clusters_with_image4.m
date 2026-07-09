@@ -50,14 +50,34 @@ function matching_clusters_with_image4(foldername)
 
         event_cluster_tmp = struct([]);
         valid_trial_count = 0;
+        ref_first_frame = [];
+
         for t = 1:numel(group_data)
-            s = load(group_data(t).filepath, 'event_cluster', 'ops');
+            s = load(group_data(t).filepath, 'event_cluster', 'ops', 'first_frame');
             if ~isfield(s, 'event_cluster') || isempty(s.event_cluster)
                 disp(['No event_cluster variable found in ', group_data(t).filepath, ' - skipping'])
                 continue
             end
 
             valid_trial_count = valid_trial_count + 1;
+            
+            if valid_trial_count == 1
+                ref_first_frame = s.first_frame;
+            elseif isfield(s.ops, 'registration_between_recording') && s.ops.registration_between_recording
+                % Compute transformation from current to reference image
+                % Set fit paramters and registration type.
+                [optimizer, metric] = imregconfig('monomodal');
+                tform = imregtform(s.first_frame, ref_first_frame, ops.registration_type, optimizer, metric);
+                
+                % Apply transformation to x_weighted and y_weighted
+                for e = 1:numel(s.event_cluster)
+                    [x_new, y_new] = transformPointsForward(tform, ...
+                        s.event_cluster(e).x_weighted, s.event_cluster(e).y_weighted);
+                    s.event_cluster(e).x_weighted = x_new;
+                    s.event_cluster(e).y_weighted = y_new;
+                end
+            end
+
             [s.event_cluster.trial] = deal(valid_trial_count);
             if isempty(event_cluster_tmp)
                 event_cluster_tmp = s.event_cluster;
@@ -79,90 +99,99 @@ function matching_clusters_with_image4(foldername)
         dist_threshold = 3;  % [pixels]
         x = [event_cluster.x_weighted];
         y = [event_cluster.y_weighted];
-        Z = linkage([x', y'], 'centroid');
-        T = cluster(Z, 'Cutoff', dist_threshold, 'criterion', 'distance');
+        if numel(x) > 1   
+            Z = linkage([x', y'], 'centroid');
+        
+            T = cluster(Z, 'Cutoff', dist_threshold, 'criterion', 'distance');
 
-        fig_suffix = '';
-        out_suffix = '';
-        if numel(group_keys) > 1
-            fig_suffix = ['_', sanitize_label(group_key)];
-            out_suffix = ['_', sanitize_label(group_key)];
-        end
-
-        fig_handle = figure;
-        gscatter(x, y, T)
-        axis equal
-        xlim([0 ops.Nx])
-        ylim([0 ops.Ny])
-        xlabel('X [px]')
-        ylabel('Y [px]')
-        set(gca, "YDir", "reverse")
-        fig_name = ['ClusterMatchingFig2_Distribution', fig_suffix];
-        save_figure(fig_handle, fig_name, foldername, ops.fig_format, ops.close_fig);
-
-        fig_handle = figure;
-        histogram(T);
-        xlabel('Group')
-        ylabel('No. of event_cluster')
-        fig_name = ['ClusterMatchingFig2_Histogram', fig_suffix];
-        save_figure(fig_handle, fig_name, foldername, ops.fig_format, ops.close_fig);
-
-        N_cluster = max(T);
-        event_cluster_overall = struct([]);
-        for c = 1:N_cluster
-            event_cluster_shortlisted = event_cluster(T == c);
-
-            total_count = 0;
-            for t = 1:N_trial-1
-                idx = [event_cluster_shortlisted.trial] == t;
-                event_cluster_cell = struct2cell(event_cluster_shortlisted(idx));
-                event_cluster_fields = fieldnames(event_cluster_shortlisted);
-                idx = ismember(event_cluster_fields, 'stim_response');
-                stim_response_all = event_cluster_cell(idx, :);
-                stim_response_all = cellfun(@(m) m(:)', stim_response_all, 'UniformOutput', 0);
-                stim_response_all = horzcat(stim_response_all{:});
-
-                stim_response_unique = unique(stim_response_all);
-
-                event_cluster_overall(c).(sprintf("trial_%d_stim_response", t)) = stim_response_unique;
-                event_cluster_overall(c).(sprintf("trial_%d_stim_response_count", t)) = length(stim_response_unique);
-
-                idx = ismember(event_cluster_fields, 'dfof');
-                dfof_all = event_cluster_cell(idx, :);
-                dfof = mean(cell2mat(dfof_all), 2);
-
-                event_cluster_overall(c).(sprintf("trial_%d_dfof", t)) = dfof;
-
-                total_count = total_count + event_cluster_overall(c).(sprintf("trial_%d_stim_response_count", t));
+            fig_suffix = '';
+            out_suffix = '';
+            if numel(group_keys) > 1
+                fig_suffix = ['_', sanitize_label(group_key)];
+                out_suffix = ['_', sanitize_label(group_key)];
             end
 
-            event_cluster_overall(c).stim_response_count = total_count;
-            event_cluster_overall(c).stim_response_pc = total_count / (ops.n_stim * N_trial);
-            event_cluster_overall(c).event_cluster_idx = find(T == c);
-            event_cluster_overall(c).matching_group_size = group_size;
-            event_cluster_overall(c).matching_group_key = group_key;
+            fig_handle = figure;
+            gscatter(x, y, T)
+            axis equal
+            xlim([0 ops.Nx])
+            ylim([0 ops.Ny])
+            xlabel('X [px]')
+            ylabel('Y [px]')
+            set(gca, "YDir", "reverse")
+            fig_name = ['ClusterMatchingFig2_Distribution', fig_suffix];
+            save_figure(fig_handle, fig_name, foldername, ops.fig_format, ops.close_fig);
 
-            idx = [event_cluster_shortlisted.trial] == N_trial;
-            if sum(idx) == 0
-                event_cluster_overall(c).max_dff_image4 = 0;
+            fig_handle = figure;
+            histogram(T);
+            xlabel('Group')
+            ylabel('No. of event_cluster')
+            fig_name = ['ClusterMatchingFig2_Histogram', fig_suffix];
+            save_figure(fig_handle, fig_name, foldername, ops.fig_format, ops.close_fig);
+
+            N_cluster = max(T);
+            event_cluster_overall = struct([]);
+            for c = 1:N_cluster
+                event_cluster_shortlisted = event_cluster(T == c);
+
+                total_count = 0;
+                for t = 1:N_trial-1
+                    idx = [event_cluster_shortlisted.trial] == t;
+                    event_cluster_cell = struct2cell(event_cluster_shortlisted(idx));
+                    event_cluster_fields = fieldnames(event_cluster_shortlisted);
+                    idx = ismember(event_cluster_fields, 'stim_response');
+                    stim_response_all = event_cluster_cell(idx, :);
+                    stim_response_all = cellfun(@(m) m(:)', stim_response_all, 'UniformOutput', 0);
+                    stim_response_all = horzcat(stim_response_all{:});
+
+                    stim_response_unique = unique(stim_response_all);
+
+                    event_cluster_overall(c).(sprintf("trial_%d_stim_response", t)) = stim_response_unique;
+                    event_cluster_overall(c).(sprintf("trial_%d_stim_response_count", t)) = length(stim_response_unique);
+
+                    idx = ismember(event_cluster_fields, 'dfof');
+                    dfof_all = event_cluster_cell(idx, :);
+                    dfof = mean(cell2mat(dfof_all), 2);
+
+                    event_cluster_overall(c).(sprintf("trial_%d_dfof", t)) = dfof;
+
+                    total_count = total_count + event_cluster_overall(c).(sprintf("trial_%d_stim_response_count", t));
+                end
+
+                event_cluster_overall(c).stim_response_count = total_count;
+                event_cluster_overall(c).stim_response_pc = total_count / (ops.n_stim * N_trial);
+                event_cluster_overall(c).event_cluster_idx = find(T == c);
+                event_cluster_overall(c).matching_group_size = group_size;
+                event_cluster_overall(c).matching_group_key = group_key;
+
+                idx = [event_cluster_shortlisted.trial] == N_trial;
+                if sum(idx) == 0
+                    event_cluster_overall(c).max_dff_image4 = 0;
+                else
+                    event_cluster_fields = fieldnames(event_cluster_shortlisted);
+                    event_cluster_image4 = struct2cell(event_cluster_shortlisted(idx));
+                    idx = ismember(event_cluster_fields, 'dfof');
+                    dfof_all = event_cluster_image4(idx, :);
+                    dfof = mean(cell2mat(dfof_all), 2);
+
+                    dfof = dfof(ops.stim_frames(1):ops.stim_frames(1)+ops.len_spike);
+                    event_cluster_overall(c).max_dff_image4 = max(dfof);
+                end
+            end
+
+            if numel(group_keys) == 1
+                filename = fullfile(foldername, 'results.mat');
             else
-                event_cluster_fields = fieldnames(event_cluster_shortlisted);
-                event_cluster_image4 = struct2cell(event_cluster_shortlisted(idx));
-                idx = ismember(event_cluster_fields, 'dfof');
-                dfof_all = event_cluster_image4(idx, :);
-                dfof = mean(cell2mat(dfof_all), 2);
-
-                dfof = dfof(ops.stim_frames(1):ops.stim_frames(1)+ops.len_spike);
-                event_cluster_overall(c).max_dff_image4 = max(dfof);
+                filename = fullfile(foldername, ['results_group', out_suffix, '.mat']);
             end
-        end
+            save(filename, 'event_cluster_overall', 'event_cluster');
 
-        if numel(group_keys) == 1
-            filename = fullfile(foldername, 'results.mat');
-        else
-            filename = fullfile(foldername, ['results_group', out_suffix, '.mat']);
-        end
-        save(filename, 'event_cluster_overall', 'event_cluster');
+        else  
+
+            disp('Only one synapse, no clustering carried out') 
+
+        end  
+
     end
 
 end

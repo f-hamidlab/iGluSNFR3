@@ -29,7 +29,7 @@
 % Last updated: 2026-02-03 15:30
 
 %% Defining pixel to be plotted
-k = find(ind == 2247);
+k = find(ind == 109820);
 % k = find(ind==sub2ind([ops.Ny, ops.Nx], 370, 57));
 
 %% Plotting
