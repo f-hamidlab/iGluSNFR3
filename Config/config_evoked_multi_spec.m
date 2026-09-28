@@ -47,7 +47,7 @@ function ops = default_evoked_spec(ops, n_specs)
     ops.binary_mask_group_size         = n_specs;  % number of recordings that reference the same binary mask; synced to top-level N
     ops.remove_px_with_no_spikes       = true;     % Remove inactive pixels (set false for low SNR data)
     ops.remove_ST                      = true;     % Remove any event_cluster that contains spike train
-    ops.redo_detection                 = true;     % Reprocess if results already exist
+    ops.redo_detection                 = false;     % Reprocess if results already exist
 
     % ========== VISUALIZATION & OUTPUT OPTIONS ==========
     ops.plot_pxMap = false;                     % Plot pixel map for each ROI (memory intensive)
