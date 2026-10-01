@@ -36,7 +36,7 @@ tic;
 disp('Saving data...')
 
 % List of variables to potentially save
-vars_to_save = {"px", "mask", "ind", "ops", "signal_raw", "signal_df", "signal_dfof", ...
+vars_to_save = {"px", "mask", "first_frame", "max_dff", "labelMask", "ind", "ops", "signal_raw", "signal_df", "signal_dfof", ...
                 "signal_dfof_movemean", "signal_baseline", "signal_edge", "event_cluster", "ROI", "stats"};
 
 % Check which variables exist in caller workspace

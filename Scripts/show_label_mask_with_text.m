@@ -18,12 +18,13 @@
 %       .fig_format: figure file format
 %
 % OUTPUTS:
+%   - labelMask: (matrix) the labeled image
 %   - Figures saved: Fig_LabelMask_Text.fig and Fig_LabelMask_Text.[format]
 %   - No variables returned
 %
 % Last updated: 2026-02-03 15:30
 
-function show_label_mask_with_text(event_cluster, ROI, ops)
+function labelMask = show_label_mask_with_text(event_cluster, ROI, ops)
 
     labelMask = zeros(ops.Ny, ops.Nx);
     ROI_list = vertcat(event_cluster.ROI);
