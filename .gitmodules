@@ -1,0 +1,7 @@
+[submodule "Scripts/MLspike/spikes"]
+path = Scripts/MLspike/spikes
+url = https://github.com/MLspike/spikes.git
+
+[submodule "Scripts/MLspike/brick"]
+path = Scripts/MLspike/brick
+url = https://github.com/MLspike/brick.git
