@@ -1,147 +1,123 @@
-%% This script detects synaptic activities from a .cxd or .tif file
-% Works for:
-% - single plane image 
-% - iGluSNFR3 probe
+%% iGluSNFR3 ACTIVITY DETECTION PIPELINE
+% Comprehensive pipeline for detecting synaptic events in single-plane widefield fluorescence imaging
+% 
+% DESCRIPTION:
+%   This script analyzes time-lapse fluorescence microscopy data to detect and characterize
+%   spontaneous synaptic activity using the iGluSNFR3 glutamate-sensing fluorescent reporter.
+%   The pipeline performs automated segmentation, baseline correction, event detection, 
+%   spatial clustering, and statistical analysis of detected events.
 %
-% Dependencies:
-% 1) MLspike toolbox (https://github.com/MLspike)
-% 2) Bio-Format Toolbox (https://bio-formats.readthedocs.io/en/v7.0.0/users/matlab/index.html, https://bio-formats.readthedocs.io/en/v7.0.0/developers/matlab-dev.html)
-% 3) Additional scripts:
-%       - cluster_events.m
-%       - event_stats.m
-%       - findpeaks_2d.m
-%       - loadBioformats.m
-%       - remove_ROI.m
-%       - remv_zero_padding.m
-%       - save_data.m
-%       - show_label_mask.m
-%       - sliding_window_filter.m
-%       - zero_padding.m
+% SUPPORTED DATA:
+%   - Single-plane, single-channel widefield fluorescence microscopy
+%   - iGluSNFR3 fluorescent probe (glutamate imaging)
+%   - Bio-Format compatible files (.cxd, .tif, .nd2, etc.)
+%   - Frame rate: User-configurable (typically 100 Hz)
 %
-% Additional scripts/functions useful for manual curation of data:
-%       - add_event.m
-%       - event_stats.m
-%       - plot_signal_pixel.m
-%       - remove_event.m
-%       - remove_ROI.m
-%       - ROI_pxMap_allTime.m
-%       - save_data.m
-%       - show_label_mask.m
-%       - spike_train.m
-%       - spike_train_par.m
-%
-% Last modified: 2025-06-26 12:31 am
-%                (include part of RJ's edit)
-%
-% 2025-06-16 - RJ added part to build list of binary images for dednrite 
-% tracing then used elements of pipeline 3 (up to defining ROIs) then
-% include simple analysis to find max dff in stimulus windows for each ROI,
-% no event clustering/refining of ROIs occurs here
+% Last modified: 2026-09-30 16:19
+% Current branch: publication_branch
+% Note: This branch is no longer updated. For improved functionalities, use the main branch instead.
 
 close all
 clear
 clc
 
-% Change the current folder to the folder of this m-file.
-if(~isdeployed)
-  cd(fileparts(matlab.desktop.editor.getActiveFilename));
-end
-
 %% Defining parameters and file paths
 % MODIFY HERE
+
+% ========== FILE PATHS ==========
 % path to data ; The script will loop through all subfolders.
-ops.filedir = 'E:\Halo i3\iGluSNFR3 transfection evoked\6weeks\250804\15AP images'; % folder
+scriptDir = fileparts(mfilename('fullpath')); % no need to change
+ops.filedir = fullfile(scriptDir, 'Test_data', 'originals');
 ops.fileformat = '.cxd';
 
 % path to saving directory
-ops.savedir = 'E:\Halo i3\iGluSNFR3 transfection evoked\6weeks\250804\15AP outputs'; % folder
+ops.savedir = fullfile(scriptDir, 'Test_data', 'outputs');
 
 % path to other required functions
-% addpath('C:\Users\jacks\OneDrive - King''s College London\My Documents\MATLAB\Jane BCI002\evoked response\')
-% addpath('C:\Users\jacks\OneDrive - King''s College London\My Documents\MATLAB\Jane BCI002\evoked response\Scripts')
-%addpath('./Scripts/MLspike/brick/')
-%addpath('./Scripts/MLspike/spikes/')
+addpath(fullfile(scriptDir, 'Scripts'))
+addpath(fullfile(scriptDir, 'Scripts/bfmatlab/'))
+addpath(fullfile(scriptDir, 'Scripts/MLspike/brick/'))
+addpath(fullfile(scriptDir, 'Scripts/MLspike/spikes/'))
 
-% processing options
-ops.pre_processing = true; % removing systematic grid line noise
-ops.bkg_subtraction = false; % background subtraction in time, true or false
-ops.tophat_max_dff  = true; % tophat filter to correct for uneven illumination
-ops.tophat_max_dff_r = 5; % radius for tophat filter % 12 [px]
-ops.use_binary_mask = true; % use binary mask from ImageJ
-ops.remove_px_with_no_spikes = true; % after masking, remove pixels with no activity. Set to false for recordings of low SNR.
-ops.redo_detection = false; % if data is already processed, redo event detection or not (set to true if you have modified settings and want to rerun detection)
+% ========== IMAGE PREPROCESSING OPTIONS ==========
+ops.pre_processing = true;                  % Remove systematic grid line noise (microscope artifact)
+ops.bkg_subtraction = false;                % Background subtraction in time domain
+ops.tophat_max_dff  = true;                 % Tophat filter for uneven illumination correction
+ops.tophat_max_dff_r = 5;                   % Tophat filter radius [pixels]
+ops.use_binary_mask = true;                 % Use user-provided binary mask (ImageJ)
+ops.remove_px_with_no_spikes = true;        % Remove inactive pixels (set false for low SNR data)
+ops.redo_detection = false;                 % Reprocess if results already exist
 
-% plotting options
-ops.plot_ROI_overall_signal = false; % plot signal for each ROI (overall)
-ops.plot_ROI_px_signal = false; % plot signal for each ROI (all pixels)
+ % ========== VISUALIZATION & OUTPUT OPTIONS ==========
+ops.plot_pxMap = false;                     % Plot pixel map for each ROI (memory intensive)
+ops.plot_ROI_overall_signal = false;        % Plot averaged signal per ROI (memory intensive)
+ops.plot_ROI_px_signal = false;             % Plot individual pixel signals per ROI (slow)
+ops.fig_format = '.png';                    % Figure format (.png, .pdf, .fig)
+ops.close_fig = true;                       % Close figures after saving (memory efficient)
 
-% additional output format for figures
-ops.fig_format = '.png';
-ops.close_fig = true; % close figure after saving
+% ========== TEMPORAL FILTERING PARAMETERS ==========
+ops.baseline_percentage = 0.2;              % Baseline percentile for drift estimation [0-1]
+ops.sl_window           = 3;                % Sliding window for baseline [s]
+ops.sl_window_ST        = 5;                % Sliding window for spike train [s]
 
-% sliding window filter
-ops.baseline_percentage = 0.2; % [0-1]
-ops.sl_window           = 3; % [s]
-ops.sl_window_ST        = 5; % [s] for spike train
+% ========== PIXEL-LEVEL FILTERING THRESHOLDS ==========
+ops.filter_by_slope = true;                 % Enable SNR-based pixel filtering
+ops.m_mode    = 'SD';                       % Mode: 'SD' (standard deviation) or 'absolute'
+ops.m_thres   = 3;                          % Threshold multiplier (3 = 3x std above baseline)
+ops.SNR_thres = 5;                          % Signal-to-noise ratio threshold for pixel inclusion
 
-% threshold for slope, below which the variation in intensity is ignored
-ops.filter_by_slope = true;
-ops.m_mode    = 'SD'; % 'SD' or 'absolute'
-ops.m_thres   = 3;    % or 20 for 'absolute'
-ops.SNR_thres = 5;
+% ========== BASELINE DRIFT DETECTION ==========
+ops.BL_drift_thres = 0.05;                  % Max RMS error for linear baseline fit (remove if exceeded)
 
-% threshold for removing signals with lot of curvatures in baseline
-ops.BL_drift_thres = 0.05;
+% ========== SPONTANEOUS EVENT DETECTION PARAMETERS ==========
+% These thresholds define event characteristics for spontaneous activity
+ops.spontaneous.rising_time_thres  = 0.05;  % Minimum event rise time [s] - filters slow drifts
+ops.spontaneous.maxISI             = 0.08;  % Maximum inter-spike interval [s] - fusion threshold
+ops.spontaneous.findpeak_window    = 0.07;  % Time window for peak detection [s]
+ops.spontaneous.dfof_MinPeakHeight = 3;     % Minimum peak height [multiples of pixel-level std]
+ops.spontaneous.peakWidth          = 0.4;   % Expected event width [s] in ΔF/F signal
+ops.spontaneous.MinPeakWidth       = 0.02;  % Minimum peak width for 1D detection [s]
+ops.spontaneous.MinPeakHeight      = 0.01;  % Minimum peak height for 2D spatial detection
 
-% thresholds for peak detection - spontaneous
-ops.spontaneous.rising_time_thres  = 0.05; % [s]
-ops.spontaneous.maxISI             = 0.08; % [s]
-ops.spontaneous.findpeak_window    = 0.07; % [s] for each pixel, findpeak in dfof
-ops.spontaneous.dfof_MinPeakHeight = 3; % for each pixel, multiple of SD
-ops.spontaneous.peakWidth          = 0.4; % [s] in time domain, for each pixel
-ops.spontaneous.MinPeakWidth       = 0.02; % for 1d findpeaks, width calculated as half-height of peak [s]
-ops.spontaneous.MinPeakHeight      = 0.01; % in space domain, for 2d findpeaks
+% ========== EXPERIMENT TYPE & STIMULATION PARAMETERS ==========
+ops.experiment_type = "evoked";             % Type: "spontaneous" or "evoked"
+% NOTE: evoked parameters below are unused for spontaneous experiments % 15AP at 1Hz starting at 3s
+ops.first_stim      =  3;                   % Time of first stimulus [s]
+ops.n_stim          = 15;                   % Total number of stimuli
+ops.stim_freq       =  1;                   % Stimulation frequency [Hz]
+ops.len_spike       =  2;                   % Expected response duration [s] from stim onset
 
-% parameters for stimuli
-ops.experiment_type = "evoked"; % "evoked" or "spontaneous"
-% if experiment_type is spontaneous, the following parameters are unused
-ops.first_stim      =  3; % time of first stim [s]
-ops.n_stim          = 15; % number of stimuli
-ops.stim_freq       =  1; % frequency of stim [Hz]
+% ========== EVOKED EVENT DETECTION PARAMETERS (if experiment_type == "evoked") ==========
+ops.evoked.rising_time_thres  = 0.15;       % Minimum response rise time [s]
+ops.evoked.maxISI             = 0.08;       % Maximum inter-spike interval [s]
+ops.evoked.findpeak_window    = 0.15;       % Time window for peak search [s]
+ops.evoked.dfof_MinPeakHeight = 2.5;        % Minimum response amplitude [multiples of std]
+ops.evoked.peakWidth          = 2;          % Expected response width [s]
+ops.evoked.MinPeakWidth       = 0.02;       % Minimum peak width for 1D detection [s]
+ops.evoked.MinPeakHeight      = 0.1;        % Minimum peak height for 2D detection
 
-ops.len_spike       =  2; % for the mask, length of one evoked spike, from the time of stimulation to the time of returning to baseline [s]
+% ========== ACQUISITION & ANALYSIS PARAMETERS ==========
+ops.fs = 100;                               % Frame rate [Hz] - MUST match data acquisition rate
 
-% thresholds for peak detection - evoked
-ops.evoked.rising_time_thres  = 0.15; % [s]
-ops.evoked.maxISI             = 0.08; % [s]
-ops.evoked.findpeak_window    = 0.15; % [s] for each pixel, findpeak in dfof
-ops.evoked.dfof_MinPeakHeight = 2.5; % for each pixel, multiple of SD
-ops.evoked.peakWidth          = 2; % [s] in time domain, for each pixel
-ops.evoked.MinPeakWidth       = 0.02; % for 1d findpeaks, width calculated as half-height of peak [s]
-ops.evoked.MinPeakHeight      = 0.1; % in space domain, for 2d findpeaks
+% ROI SIZE FILTERING (optional - comment out to disable)
+ops.Area_thres_max = 50;                    % Maximum ROI area [pixels] - filters noise clusters
+% ops.Area_thres_min = 1;                   % Minimum ROI area [pixels] - uncomment if needed
 
-% frame rate
-ops.fs = 100; % [Hz]
+% ========== SPATIAL CLUSTERING PARAMETERS ==========
+ops.cutoff = 5;                             % Distance cutoff for clustering [pixels]
+                                            % ROIs within this distance + synchronized timing = merged
 
-% filter for min/max ROI area (comment out if filter is not needed)
-% ops.Area_thres_min = 1; % [px]
-ops.Area_thres_max = 50; % [px]
-
-
-% cutoff for clustering
-ops.cutoff = 5; % [pixels]
-
-% parameters for spike train 
-ops.ST.option = "findpeaks"; % "findpeaks" or "MLspike"
-ops.ST.MinPeakHeight = 0.05;
-ops.ST.sumOfPeak_window = 0.5; % [s]
-ops.ST.gaussian_window  = 0.1; % [s]
-ops.ST.gap_thres        = 0.3; % [s]
-ops = spike_train_par(ops);
-
-
+% ========== SPIKE TRAIN ANALYSIS PARAMETERS ==========
+ops.ST.option           = "findpeaks";      % Method: "MLspike" (recommended) or "findpeaks"
+ops.ST.MinPeakHeight    = 0.05;             % Minimum spike amplitude
+ops.ST.sumOfPeak_window = 0.5;              % Window for spike summation [s]
+ops.ST.gaussian_window  = 0.1;              % Gaussian smoothing window [s]
+ops.ST.gap_thres        = 0.3;              % Gap threshold for spike identification [s]
 
 %%
+
+ops = spike_train_par(ops);
+
 if ~exist(ops.savedir, 'dir')
     mkdir(ops.savedir)
 end
@@ -342,7 +318,8 @@ toc
 
 % plot first frame
 fig_handle = figure;
-imagesc(squeeze(im_data(:,:,1)))
+first_frame = squeeze(im_data(:,:,1));
+imagesc(first_frame)
 title(sprintf('Frame %d',1))
 xlabel('X [px]')
 ylabel('Y [px]')
@@ -589,7 +566,7 @@ disp('Screening for events...')
 % use parallel computing
 parfor i = 1:size(signal_raw,2) % for each pixel
     disp(i)
-    % TODO
+    
     px_edge = signal_edge(:,i);
     px_df = signal_df(:,i);
     px_dfof = signal_dfof(:,i);
@@ -881,11 +858,11 @@ end
 %% raster plot
 rasterplot(ops,event_cluster);
 
+%%
+labelMask = show_label_mask_with_text(event_cluster, ROI, ops);
+
 %% save data
 save_data()
-
-%%
-show_label_mask_with_text(event_cluster, ROI, ops)
 
 close all
 
