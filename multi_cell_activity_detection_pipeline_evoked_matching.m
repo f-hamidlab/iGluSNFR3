@@ -27,11 +27,11 @@ clc
 % ========== FILE PATHS ==========
 % path to data ; The script will loop through all subfolders.
 scriptDir = fileparts(mfilename('fullpath')); % no need to change
-ops.filedir = fullfile(scriptDir, 'Test_data', 'originals');
+ops.filedir = fullfile(scriptDir, 'Test_data', 'originals'); % path to data folder (change if needed)
 ops.fileformat = '.cxd';
 
 % path to saving directory
-ops.savedir = fullfile(scriptDir, 'Test_data', 'outputs');
+ops.savedir = fullfile(scriptDir, 'Test_data', 'outputs'); % path to saving directory (change if needed)
 
 % path to other required functions
 addpath(fullfile(scriptDir, 'Scripts'))
@@ -279,8 +279,8 @@ if ops.pre_processing
     im_data(ops.Ny/2+1:end,:,:) = im_data(ops.Ny/2+1:end,:,:)./ repmat(colMeans2, [ops.Ny/2, 1, 1]);
 
     % save image as tif
-    options.overwrite = true;
-    saveastiff(im_data, strcat(ops.savedir, filesep, 'denoised_im.tif'), options)
+    % options.overwrite = true;
+    % saveastiff(im_data, strcat(ops.savedir, filesep, 'denoised_im.tif'), options)
 
     fig_handle = figure;
     tiledlayout(2,2)
