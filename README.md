@@ -108,7 +108,7 @@ No package manager or compilation step is required for the bundled MATLAB script
 
 ## 3. Demo
 
-The demo dataset can be downloaded from Zenodo: **[ADD DATASET LINK]**.
+The demo dataset can be downloaded from [Zenodo](https://zenodo.org/records/23164224).
 The dataset includes three `.cxd` demo recordings in `Test_data/originals/` and corresponding processed results in `Test_data/outputs/`. The supplied recordings are `Cell1_1.cxd`, `Cell1_2.cxd`, and `Cell1_3.cxd`. The binary mask used by the pipeline is `MAX_Cell1_1_binary_dil3.tif` in the same directory.
 
 Recording and mask image properties:
@@ -266,7 +266,7 @@ figures and `results.mat` at the specified output root.
 - **`tps_mlspikes` not found:** verify that `Scripts/MLspike/` is on the MATLAB path, including its subdirectories.
 - **No mask found:** check that the mask is beside the input recording and its filename matches `MAX_Cell*_binary_*.tif`, or disable binary-mask use.
 - **Existing data is skipped:** set `ops.redo_detection = true`.
-- **Out-of-memory or slow processing:** process fewer recordings at once, reduce the image/time-series size, or record the available-memory guidance here: **[FILL IN]**.
+- **Out-of-memory or slow processing:** process fewer recordings at once, reduce the image/time-series size.
 
 ## 5. License
 
